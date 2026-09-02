@@ -1,0 +1,73 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ── User (synced with Supabase Auth) ──────────────────────
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  role      String   @default("admin")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  conversations Conversation[]
+}
+
+// ── Conversation ──────────────────────────────────────────
+model Conversation {
+  id        String   @id @default(cuid())
+  sessionId String   @unique
+  language  String   @default("en") // "en" | "ur"
+  status    String   @default("active") // "active" | "archived"
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  messages Message[]
+
+  @@index([language])
+  @@index([status])
+}
+
+// ── Message ───────────────────────────────────────────────
+model Message {
+  id           String   @id @default(cuid())
+  conversationId String
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  role         String   // "user" | "bot"
+  content      String
+  timestamp    DateTime @default(now())
+
+  @@index([conversationId])
+}
+
+// ── Knowledge Base Entry ──────────────────────────────────
+model KnowledgeBaseEntry {
+  id          String   @id @default(cuid())
+  title       String
+  titleUr     String   @default("")
+  category    String   // "facility-finder" | "eligibility-check" | "transport-guidance"
+  language    String   @default("both") // "en" | "ur" | "both"
+  status      String   @default("active") // "active" | "inactive"
+  contentEn   String   @default("")
+  contentUr   String   @default("")
+  fileUrl     String?  // Supabase Storage file URL (PDF, etc.)
+  fileName    String?  // Original file name
+  lastUpdated DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([category])
+  @@index([status])
+}
