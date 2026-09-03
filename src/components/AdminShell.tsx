@@ -1,18 +1,28 @@
 "use client";
 
 import { useRouter, usePathname } from "next/navigation";
+import Image from "next/image";
 import { useState, type ReactNode } from "react";
 import {
   LayoutGrid,
   Database,
   LogOut,
   Menu,
+  Phone,
+  MessageCircle,
+  Settings,
+  Building2,
+  ChevronDown,
 } from "lucide-react";
 
 /* ── Nav items ─────────────────────────────────────────── */
 const NAV_ITEMS = [
   { label: "Dashboard", href: "/admin/dashboard", icon: LayoutGrid },
   { label: "Knowledge Base", href: "/admin/knowledge-base", icon: Database },
+  { label: "Telephony Management", href: "/admin/telephony", icon: Phone },
+  { label: "WhatsApp Management", href: "/admin/whatsapp", icon: MessageCircle },
+  { label: "Agent Settings", href: "/admin/agent-settings", icon: Settings },
+  { label: "Tenant Management", href: "/admin/tenants", icon: Building2 },
 ];
 
 /* ── Props ─────────────────────────────────────────────── */
@@ -30,6 +40,7 @@ export default function AdminShell({
   const router = useRouter();
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
 
   const handleLogout = async () => {
     await fetch("/api/admin/logout", { method: "POST" });
@@ -53,10 +64,22 @@ export default function AdminShell({
         }`}
       >
         {/* Brand */}
-        <div className="flex flex-col items-center px-5 pt-5 pb-2">
-          <span className="text-lg font-bold text-white">Muawin</span>
-          <p className="text-[11px] text-blue-200">Al Khidmat Foundation</p>
-        </div>
+        <button
+          onClick={() => router.push("/")}
+          className="flex w-full items-center gap-2 px-5 pt-5 pb-2 transition-opacity hover:opacity-80"
+        >
+          <Image
+            src="/awaz-mark.png"
+            alt="Muawin"
+            width={28}
+            height={28}
+            className="rounded-lg bg-white p-0.5"
+          />
+          <div className="flex flex-col items-start">
+            <span className="text-lg font-bold text-white">Muawin</span>
+            <p className="text-[11px] text-blue-200">Al Khidmat Foundation</p>
+          </div>
+        </button>
 
         {/* Nav */}
         <nav className="mt-4 flex flex-col gap-1 px-3">
@@ -66,7 +89,7 @@ export default function AdminShell({
               <button
                 key={item.label}
                 onClick={() => router.push(item.href)}
-                className={`flex items-center gap-3 rounded-md px-4 py-2.5 text-sm font-medium transition-colors ${
+                className={`flex items-center gap-3 rounded-md px-4 py-2.5 text-left text-sm font-medium leading-snug transition-colors ${
                   isActive
                     ? "bg-white/15 text-white"
                     : "text-white/70 hover:bg-white/10 hover:text-white"
@@ -103,14 +126,38 @@ export default function AdminShell({
           </button>
 
           {/* Right: User profile */}
-          <div className="ml-auto flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-blue-400">
-              <span className="text-xs font-bold text-white">MA</span>
-            </div>
-            <span className="text-sm font-medium text-white">
-              Muhammad Asad
-            </span>
-            {/* <ChevronDown className="h-4 w-4 text-white/70" /> */}
+          <div className="relative ml-auto">
+            <button
+              onClick={() => setProfileOpen(!profileOpen)}
+              className="flex items-center gap-2 rounded-lg px-2 py-1 transition-colors hover:bg-white/10"
+            >
+              <div className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-blue-400">
+                <span className="text-xs font-bold text-white">MA</span>
+              </div>
+              <span className="text-sm font-medium text-white">
+                Muhammad Asad
+              </span>
+              <ChevronDown className={`h-4 w-4 text-white/70 transition-transform ${profileOpen ? "rotate-180" : ""}`} />
+            </button>
+
+            {/* Dropdown */}
+            {profileOpen && (
+              <>
+                <div className="fixed inset-0 z-30" onClick={() => setProfileOpen(false)} />
+                <div className="absolute right-0 mt-2 w-44 rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
+                  <button
+                    onClick={() => {
+                      setProfileOpen(false);
+                      handleLogout();
+                    }}
+                    className="flex w-full items-center gap-2 px-4 py-2 text-sm text-gray-700 transition-colors hover:bg-gray-50"
+                  >
+                    <LogOut className="h-4 w-4" />
+                    Logout
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </header>
 

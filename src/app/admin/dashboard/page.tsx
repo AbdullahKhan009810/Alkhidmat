@@ -142,6 +142,8 @@ export default function DashboardPage() {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [selectedTranscript, setSelectedTranscript] = useState<Conversation | null>(null);
   const [loading, setLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 10;
 
   useEffect(() => {
     async function fetchConversations() {
@@ -166,6 +168,18 @@ export default function DashboardPage() {
     return `"${text}${firstMsg.content.length > 60 ? "..." : ""}"`;
   };
 
+  const totalPages = Math.ceil(conversations.length / ITEMS_PER_PAGE);
+  const paginatedConversations = conversations.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
+
+  const goToPage = (page: number) => {
+    if (page >= 1 && page <= totalPages) {
+      setCurrentPage(page);
+    }
+  };
+
   return (
     <AdminShell
       pageTitle="Dashboard"
@@ -177,7 +191,7 @@ export default function DashboardPage() {
         <div className="rounded-xl border border-gray-200 bg-white p-6">
           <div className="flex items-center gap-2">
             <MessageSquare className="h-5 w-5 text-[#005A9E]" />
-            <span className="text-lg font-semibold text-gray-900">Total Cases</span>
+            <span className="text-lg font-semibold text-gray-900">Total Calls</span>
           </div>
           <p className="mt-2 text-sm text-gray-500">
             View and manage welfare assistance requests
@@ -191,13 +205,13 @@ export default function DashboardPage() {
             </p>
           </div>
         </div>
-        {/* Transcripts card */}
+        {/* Last Call card */}
         <div className="rounded-xl border border-gray-200 bg-white p-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <FileText className="h-5 w-5 text-[#005A9E]" />
               <span className="text-lg font-semibold text-gray-900">
-                Transcripts
+                Last Call
               </span>
             </div>
             {conversations.length > 0 && (
@@ -260,7 +274,7 @@ export default function DashboardPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-100 text-left text-xs font-medium uppercase tracking-wide text-gray-400">
-                  <th className="px-6 py-3">Session ID</th>
+                  <th className="px-6 py-3">ID</th>
                   <th className="px-6 py-3">Transcript Preview</th>
                   <th className="px-6 py-3">Language</th>
                   <th className="px-6 py-3">Messages</th>
@@ -268,7 +282,7 @@ export default function DashboardPage() {
                 </tr>
               </thead>
               <tbody>
-                {conversations.map((row) => (
+                {paginatedConversations.map((row) => (
                   <tr
                     key={row.id}
                     className="border-b border-gray-50 last:border-0"
@@ -305,6 +319,46 @@ export default function DashboardPage() {
             </table>
           )}
         </div>
+
+        {/* ── Pagination ────────────────────────────── */}
+        {!loading && totalPages > 1 && (
+          <div className="flex items-center justify-between border-t border-gray-200 px-6 py-4">
+            <p className="text-xs text-gray-500">
+              Showing {(currentPage - 1) * ITEMS_PER_PAGE + 1}–
+              {Math.min(currentPage * ITEMS_PER_PAGE, conversations.length)} of{" "}
+              {conversations.length}
+            </p>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => goToPage(currentPage - 1)}
+                disabled={currentPage === 1}
+                className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Previous
+              </button>
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                <button
+                  key={page}
+                  onClick={() => goToPage(page)}
+                  className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
+                    page === currentPage
+                      ? "bg-[#005A9E] text-white"
+                      : "border border-gray-200 text-gray-600 hover:bg-gray-50"
+                  }`}
+                >
+                  {page}
+                </button>
+              ))}
+              <button
+                onClick={() => goToPage(currentPage + 1)}
+                disabled={currentPage === totalPages}
+                className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        )}
 
         {!loading && conversations.length === 0 && (
           <div className="py-12 text-center text-sm text-gray-400">

@@ -9,7 +9,7 @@ import CallPanel from "@/components/CallPanel";
 import TranscriptPanel from "@/components/TranscriptPanel";
 import Footer from "@/components/Footer";
 import Toast, { type ToastType } from "@/components/ui/Toast";
-import { HERO_HEADING, HERO_SUBHEADING } from "@/lib/constants";
+import { HERO_HEADING, HERO_SUBTITLE, HERO_SUBHEADING } from "@/lib/constants";
 
 /** Split buffered text into complete sentences, leaving the rest unflushed. */
 function flushSentences(buffer: string): { sentences: string[]; remaining: string } {
@@ -414,6 +414,7 @@ export default function Home() {
           <h1 className="text-2xl font-bold tracking-tight text-gray-900 sm:text-4xl">
             {HERO_HEADING}
           </h1>
+          <p className="mt-1 text-sm text-gray-400">{HERO_SUBTITLE}</p>
           <p className="mt-3 text-base text-gray-500">{HERO_SUBHEADING}</p>
         </section>
 

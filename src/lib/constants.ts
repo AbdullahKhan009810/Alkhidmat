@@ -1,16 +1,11 @@
 /* ── Brand & header ────────────────────────────────────── */
 export const BRAND_NAME = "Muawin";
 
-export const HEADER_STATUS_ITEMS = [
-  { label: "Secure by Design", active: false },
-  { label: "Multilingual Support", active: false },
-  { label: "Demo Assistant", active: true },
-] as const;
-
 /* ── Hero ──────────────────────────────────────────────── */
 export const HERO_HEADING = "Muawin";
+export const HERO_SUBTITLE = "Demo Assistant";
 export const HERO_SUBHEADING =
-  "Voice-powered welfare assistance in English and Urdu";
+  "AI Voice-Powered welfare assistance in multiple languages";
 
 /* ── Language toggle ───────────────────────────────────── */
 export const LANGUAGE_OPTIONS = [
@@ -22,10 +17,10 @@ export const LANGUAGE_OPTIONS = [
    Moved to lib/translations.ts for i18n support.          */
 
 /* ── Footer ────────────────────────────────────────────── */
-export const FOOTER_COPYRIGHT = "© 2024 Al Khidmat Foundation. All rights reserved.";
+export const FOOTER_COPYRIGHT = "© 2026 Muawin powered by Aridian Technologies. All rights reserved.";
 
 export const FOOTER_LINKS = [
-  "Privacy Policy",
-  "Terms of Service",
-  "Contact Support",
+  { label: "Privacy Policy", href: "/privacy-policy" },
+  { label: "Terms of Service", href: "/terms-of-service" },
+  { label: "Contact Support", href: "/contact-support" },
 ] as const;

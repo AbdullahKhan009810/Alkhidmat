@@ -49,13 +49,18 @@ export default function TranscriptPanel({
         className="flex flex-1 flex-col overflow-y-auto rounded-2xl bg-[#EEF1F8] px-4 py-4"
         style={{ maxHeight: "380px", minHeight: "260px" }}
       >
-        {messages.length === 0 && !interimText && !streamingText ? (
+        {!transcriptEnabled ? (
           <div className="flex flex-1 flex-col items-center justify-center">
             <Circle className="mb-3 h-5 w-5 text-gray-300" />
             <p className="text-center text-sm text-gray-400">
-              {callActive && transcriptEnabled
-                ? t.listeningForSpeech
-                : t.transcriptEmpty}
+              {t.transcriptEmpty}
+            </p>
+          </div>
+        ) : messages.length === 0 && !interimText && !streamingText ? (
+          <div className="flex flex-1 flex-col items-center justify-center">
+            <Circle className="mb-3 h-5 w-5 text-gray-300" />
+            <p className="text-center text-sm text-gray-400">
+              {callActive ? t.listeningForSpeech : t.transcriptEmpty}
             </p>
           </div>
         ) : (
