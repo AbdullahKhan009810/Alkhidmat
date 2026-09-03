@@ -43,7 +43,7 @@ export default function ContactSupport() {
         <div className="mx-auto max-w-3xl">
           <h1 className="text-3xl font-bold text-gray-900">Contact Support</h1>
           <p className="mt-2 text-sm text-gray-500">
-            We're here to help. Reach out to us through any of the channels below.
+            We&apos;re here to help. Reach out to us through any of the channels below.
           </p>
 
           <div className="mt-8 space-y-6">
