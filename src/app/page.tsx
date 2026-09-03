@@ -27,14 +27,17 @@ function flushSentences(buffer: string): { sentences: string[]; remaining: strin
   return { sentences, remaining };
 }
 
-/** Fix common Urdu misspellings the LLM makes (e.g. الکھدمت → الخدمت) */
+/** Fix common Urdu misspellings the LLM makes (e.g. الکھدمت → الخدمت, مبین → معاون) */
 function normalizeUrdu(text: string): string {
-  return text.replace(/الکھدمت/g, "الخدمت").replace(/کھدمت/g, "خدمت");
+  return text
+    .replace(/الکھدمت/g, "الخدمت")
+    .replace(/کھدمت/g, "خدمت")
+    .replace(/مبین/g, "معاون");
 }
 
-/** Greeting spoken when a call starts (masculine phrasing to match the broadband-support voice) */
+/** Greeting spoken when a call starts (masculine Urdu for male voice, feminine English for female voice) */
 const GREETINGS: Record<Language, string> = {
-  en: "Assalam o Alaikum! I am speaking from Al Khidmat Foundation. How can I help you?",
+  en: "Assalam o Alaikum! This is Fatima from Al Khidmat Foundation. How can I help you?",
   ur: "السلام علیکم! میں الخدمت فاؤنڈیشن سے بات کر رہا ہوں۔ میں آپ کی کیا مدد کر سکتا ہوں؟",
 };
 
