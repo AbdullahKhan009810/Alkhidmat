@@ -117,7 +117,11 @@ function closingAnswer(message: string, language?: string): string | null {
  * repeat turns play immediately. Only fires when nothing substantive remains
  * after stripping politeness words, so "ہسپتال کیسے جاؤں" still goes to RAG.
  */
-function smallTalkAnswer(message: string, language?: string): string | null {
+function smallTalkAnswer(
+  message: string,
+  language?: string,
+  history?: Array<{ role: string; content: string }>
+): string | null {
   const t = message.trim();
   if (!t || t.length > 60) return null;
 
@@ -163,15 +167,24 @@ function smallTalkAnswer(message: string, language?: string): string | null {
     return null;
   }
 
+  // Check if we already greeted in this conversation — if yes, don't greet again
+  const alreadyGreeted = Array.isArray(history) && history.some(
+    (m) =>
+      m.role === "assistant" &&
+      /assalam|alaikum|hello|hi,|hey,|how can i (help|assist)|how may i/i.test(m.content)
+  );
+
   if (urdu) {
     if (howAreYou) return "میں بالکل ٹھیک ہوں، شکریہ! آپ کیسے ہیں؟";
     if (identity)
       return "میں معاون ہوں، الخدمت فاؤنڈیشن کا وائس اسسٹنٹ ہوں۔ میں ہسپتال، مفت علاج اور ایمبولینس کے بارے میں رہنمائی دے سکتا ہوں۔";
+    if (alreadyGreeted) return "جی ہاں، میں یہاں ہوں — بتائیں کیا مدد چاہیے؟";
     return "و علیکم السلام! میں الخدمت فاؤنڈیشن سے بات کر رہا ہوں۔ بتائیں، میں آپ کی کیا مدد کر سکتا ہوں؟";
   }
   if (howAreYou) return "I'm doing great, thank you! How about you?";
   if (identity)
     return "I'm Muawin, a voice assistant for Al Khidmat Foundation. I can help with hospitals, free treatment, and ambulance guidance.";
+  if (alreadyGreeted) return "Yes, I'm here — Muawin, your Al Khidmat voice assistant. What would you like help with?";
   return "Assalam o Alaikum! This is Muawin, voice assistant for Al Khidmat Foundation. How can I help you?";
 }
 
@@ -342,7 +355,7 @@ export async function POST(request: Request) {
     }
 
     // 0.5 Ultra-common small talk (greeting / how-are-you / identity) — instant
-    const smallTalk = smallTalkAnswer(message, language);
+    const smallTalk = smallTalkAnswer(message, language, history);
     if (smallTalk) {
       return sendAnswer(normalizeUrduAnswer(smallTalk), [], false, !!stream);
     }
