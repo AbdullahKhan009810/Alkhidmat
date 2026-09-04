@@ -183,7 +183,6 @@ function smallTalkAnswer(message: string, language?: string): string | null {
 function smallTalkPrompt(language: string): string {
   const fallback = language === "ur" ? HELPLINE_FALLBACK_UR : HELPLINE_FALLBACK_EN;
   const isUrdu = language === "ur";
-  const botName = "Muawin";
   const genderRule = isUrdu
     ? "Use MASCULINE Urdu grammar: کرتا ہوں, بتاتا ہوں, سکتا ہوں (never feminine کرتی/بتاتی)."
     : "Use warm, friendly phrasing.";
