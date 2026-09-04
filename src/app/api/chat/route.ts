@@ -192,9 +192,6 @@ function smallTalkPrompt(language: string): string {
   const clarificationMsg = isUrdu
     ? "براہ کرم بتائیں میں آپ کی کیا مدد کر سکتا ہوں؟ میں الخدمت کی بہبودی خدمات کے بارے میں معلومات دے سکتا ہوں۔"
     : "Could you please clarify what you need help with? I can assist with Al Khidmat's welfare services.";
-  const offTopicMsg = isUrdu
-    ? "میں الخدمت فاؤنڈیشن کا وائس اسسٹنٹ ہوں — میں صرف الخدمت کی بہبودی خدمات کے بارے میں معلومات دے سکتا ہوں۔ براہِ کرم دوسری مدد کے لیے الخدمت ہیلپ لائن 051-4853951 پر کال کریں۔"
-    : "I'm a voice assistant for Al Khidmat Foundation — I can only help with information about our welfare services. Please call our helpline at 051-4853951 for other assistance.";
 
   return `You are Muawin, a voice assistant for Al Khidmat Foundation (Pakistan). You are NOT a human.
 
@@ -255,10 +252,6 @@ function systemPrompt(context: string, language: string = "en"): string {
   const nameNote = isUrdu
     ? "Your name is معاون — always write it this way. NEVER write مبین. NEVER include spelling guides, letter breakdowns, or pronunciation hints."
     : "";
-
-  const offTopicMsg = isUrdu
-    ? "میں الخدمت فاؤنڈیشن کا وائس اسسٹنٹ ہوں — میں صرف الخدمت کی بہبودی خدمات کے بارے میں معلومات دے سکتا ہوں۔ براہِ کرم دوسری مدد کے لیے الخدمت ہیلپ لائن 051-4853951 پر کال کریں۔"
-    : "I'm a voice assistant for Al Khidmat Foundation — I can only help with information about our welfare services. Please call our helpline at 051-4853951 for other assistance.";
 
   const identityUr = `${botNameUrdu}، الخدمت فاؤنڈیشن کا وائس اسسٹنٹ`;
   const identityEn = "Muawin, a voice assistant";
