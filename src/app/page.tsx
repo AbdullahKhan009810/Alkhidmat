@@ -59,6 +59,7 @@ export default function Home() {
   const playingRef = useRef(false);
   const ttsChainRef = useRef<Promise<void>>(Promise.resolve());
   const audioGenerationRef = useRef(0);
+  const ttsAbortRef = useRef<AbortController | null>(null);
   callActiveRef.current = callStatus === "listening" && !muted;
 
   /* Mirror of messages state — lets handleChat read the latest turns without
@@ -112,6 +113,7 @@ export default function Home() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ text, language: locale === "ur" ? "ur" : "en" }),
+          signal: ttsAbortRef.current?.signal,
         });
         if (!res.ok || generation !== audioGenerationRef.current) return;
         
@@ -123,7 +125,9 @@ export default function Home() {
         audioQueueRef.current.push(url);
         playNextAudio();
       } catch (err) {
-        console.error("TTS playback failed:", err);
+        if ((err as Error).name !== "AbortError") {
+          console.error("TTS playback failed:", err);
+        }
       }
     });
 
@@ -373,6 +377,8 @@ export default function Home() {
   const handleStartCall = useCallback(() => {
     // Side effects live outside the state updater so they never run twice
     if (callStatus === "idle") {
+      // Create fresh abort controller for this call's TTS requests
+      ttsAbortRef.current = new AbortController();
       const greeting = GREETINGS[language];
       setMessages([
         { role: "bot", content: greeting, timestamp: getCurrentTime() },
@@ -391,12 +397,26 @@ export default function Home() {
       }
       setCallStatus("listening");
     } else {
-      // Ending call — stop audio, clear queue, save conversation to database
+      // Ending call — stop audio, cancel pending TTS, clear queue, save conversation
       audioGenerationRef.current += 1;
       ttsChainRef.current = Promise.resolve();
-      audioRef.current?.pause();
+
+      // Abort any in-flight TTS fetch requests
+      ttsAbortRef.current?.abort();
+      ttsAbortRef.current = null;
+
+      // Fully stop current audio playback
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.currentTime = 0;
+        audioRef.current = null;
+      }
+
+      // Clear the audio queue and revoke blob URLs to free memory
+      audioQueueRef.current.forEach((url) => URL.revokeObjectURL(url));
       audioQueueRef.current = [];
       playingRef.current = false; // force-unblock playNextAudio
+
       saveConversationToDB();
       setCallStatus("idle");
     }
