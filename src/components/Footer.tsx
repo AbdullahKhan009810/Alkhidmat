@@ -39,6 +39,22 @@ export default function Footer() {
             </a>
           </span>
         ))}
+        <span className="text-gray-300">|</span>
+        <a
+          href="https://www.aridiantechnologies.com/"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center transition-opacity hover:opacity-80"
+          title="Aridian Technologies"
+        >
+          <Image
+            src="/at-logo.png"
+            alt="Aridian Technologies"
+            width={28}
+            height={28}
+            className="rounded"
+          />
+        </a>
       </div>
     </footer>
   );

@@ -1,11 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { Mail, Lock, ArrowRight } from "lucide-react";
+import { useRouter } from "next/navigation";
+import Image from "next/image";
+import { Mail, Lock, ArrowRight, Home } from "lucide-react";
 import TextInput from "@/components/ui/TextInput";
 import { createClient } from "@/lib/supabase/client";
 
 export default function AdminLoginPage() {
+  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -45,9 +48,21 @@ export default function AdminLoginPage() {
         {/* Decorative top-right circle */}
         <div className="pointer-events-none absolute -right-10 -top-10 h-36 w-36 rounded-full bg-blue-50/80" />
 
-        {/* ── Brand + Heading ───────────────────────────── */}
+        {/* ─ Brand + Heading ───────────────────────────── */}
         <div className="relative mb-8 text-center">
-          <h1 className="text-3xl font-bold text-[#0F5CC3]">Muawin</h1>
+          <button
+            onClick={() => router.push("/")}
+            className="mx-auto inline-flex items-center gap-2 transition-opacity hover:opacity-80"
+          >
+            <Image
+              src="/awaz-mark.png"
+              alt="Muawin"
+              width={32}
+              height={32}
+              className="rounded-lg bg-white p-0.5"
+            />
+            <h1 className="text-3xl font-bold text-[#0F5CC3]">Muawin</h1>
+          </button>
           <h2 className="mt-1 text-xl font-semibold text-gray-900">
             Welcome Back
           </h2>
@@ -83,15 +98,25 @@ export default function AdminLoginPage() {
             </p>
           )}
 
-          {/* Login Button */}
-          <button
-            type="submit"
-            disabled={loading}
-            className="flex w-full items-center justify-center gap-2 rounded-lg bg-[#0F5CC3] py-3 text-sm font-semibold text-white transition-colors hover:bg-[#0d4fa8] disabled:opacity-60"
-          >
-            {loading ? "Signing in..." : "Login"}
-            <ArrowRight className="h-4 w-4" />
-          </button>
+          {/* Home + Login Buttons */}
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={() => router.push("/")}
+              className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-[#0F5CC3] bg-white py-3 text-sm font-semibold text-[#0F5CC3] transition-colors hover:bg-blue-50"
+            >
+              <Home className="h-4 w-4" />
+              Go to Home
+            </button>
+            <button
+              type="submit"
+              disabled={loading}
+              className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-[#0F5CC3] py-3 text-sm font-semibold text-white transition-colors hover:bg-[#0d4fa8] disabled:opacity-60"
+            >
+              {loading ? "Signing in..." : "Login"}
+              <ArrowRight className="h-4 w-4" />
+            </button>
+          </div>
         </form>
       </div>
     </div>

@@ -182,6 +182,8 @@ export default function KnowledgeBasePage() {
   const [activeCategory, setActiveCategory] = useState("all");
   const [selectedEntry, setSelectedEntry] = useState<KBEntry | null>(null);
   const [loading, setLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 10;
 
   // Upload state
   const [showUpload, setShowUpload] = useState(false);
@@ -218,6 +220,29 @@ export default function KnowledgeBasePage() {
       activeCategory === "all" || entry.category === activeCategory;
     return matchSearch && matchCategory;
   });
+
+  const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE);
+  const paginated = filtered.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
+
+  const goToPage = (page: number) => {
+    if (page >= 1 && page <= totalPages) {
+      setCurrentPage(page);
+    }
+  };
+
+  // Reset to page 1 when search or category changes
+  const handleSearchChange = (value: string) => {
+    setSearch(value);
+    setCurrentPage(1);
+  };
+
+  const handleCategoryChange = (catId: string) => {
+    setActiveCategory(catId);
+    setCurrentPage(1);
+  };
 
   const getCount = (catId: string) =>
     entries.filter((e) => e.category === catId).length;
@@ -276,6 +301,7 @@ export default function KnowledgeBasePage() {
       const res = await fetch("/api/knowledge-base");
       const data = await res.json();
       setEntries(data);
+      setCurrentPage(1);
     } catch (err) {
       console.error("Upload error:", err);
       alert(err instanceof Error ? err.message : "Upload failed");
@@ -292,7 +318,7 @@ export default function KnowledgeBasePage() {
       {/* ── Use Case Cards ─────────────────────────────── */}
       <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <button
-          onClick={() => setActiveCategory("all")}
+          onClick={() => handleCategoryChange("all")}
           className={`rounded-xl border p-4 text-center transition-colors ${
             activeCategory === "all"
               ? "border-[#005A9E] bg-[#005A9E]/5"
@@ -307,7 +333,7 @@ export default function KnowledgeBasePage() {
         {USE_CASES.map((useCase) => (
           <button
             key={useCase.id}
-            onClick={() => setActiveCategory(useCase.id)}
+            onClick={() => handleCategoryChange(useCase.id)}
             className={`rounded-xl border p-4 text-center transition-colors ${
               activeCategory === useCase.id
                 ? "border-[#005A9E] bg-[#005A9E]/5"
@@ -335,7 +361,7 @@ export default function KnowledgeBasePage() {
             type="text"
             placeholder="Search entries..."
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => handleSearchChange(e.target.value)}
             className="w-full rounded-lg border border-gray-200 bg-white py-2.5 pl-10 pr-4 text-sm text-gray-700 outline-none transition-colors focus:border-[#005A9E] focus:ring-1 focus:ring-[#005A9E]"
           />
         </div>
@@ -369,7 +395,7 @@ export default function KnowledgeBasePage() {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((entry) => {
+                {paginated.map((entry) => {
                   const useCase = USE_CASES.find((c) => c.id === entry.category);
                   return (
                     <tr
@@ -438,6 +464,46 @@ export default function KnowledgeBasePage() {
             </table>
           )}
         </div>
+
+        {/* ── Pagination ────────────────────────────── */}
+        {!loading && totalPages > 1 && (
+          <div className="flex items-center justify-between border-t border-gray-200 px-6 py-4">
+            <p className="text-xs text-gray-500">
+              Showing {(currentPage - 1) * ITEMS_PER_PAGE + 1}–
+              {Math.min(currentPage * ITEMS_PER_PAGE, filtered.length)} of{" "}
+              {filtered.length}
+            </p>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => goToPage(currentPage - 1)}
+                disabled={currentPage === 1}
+                className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Previous
+              </button>
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                <button
+                  key={page}
+                  onClick={() => goToPage(page)}
+                  className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
+                    page === currentPage
+                      ? "bg-[#005A9E] text-white"
+                      : "border border-gray-200 text-gray-600 hover:bg-gray-50"
+                  }`}
+                >
+                  {page}
+                </button>
+              ))}
+              <button
+                onClick={() => goToPage(currentPage + 1)}
+                disabled={currentPage === totalPages}
+                className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        )}
 
         {!loading && filtered.length === 0 && (
           <div className="py-12 text-center text-sm text-gray-400">

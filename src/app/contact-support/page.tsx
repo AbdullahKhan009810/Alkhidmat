@@ -1,5 +1,6 @@
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
+import Image from "next/image";
 import { Mail, MapPin } from "lucide-react";
 
 /* ── Social icon SVGs ─────────────────────────────────── */
@@ -64,6 +65,21 @@ export default function ContactSupport() {
                     <social.icon className={`h-6 w-6 ${social.color}`} />
                   </a>
                 ))}
+                <a
+                  href="https://www.aridiantechnologies.com/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex h-12 w-12 items-center justify-center rounded-full bg-gray-200/60 transition-transform hover:scale-110"
+                  title="Aridian Technologies"
+                >
+                  <Image
+                    src="/at-logo.png"
+                    alt="Aridian Technologies"
+                    width={28}
+                    height={28}
+                    className="rounded"
+                  />
+                </a>
               </div>
             </div>
 
