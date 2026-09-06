@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { createClient } from "@/lib/supabase/server";
 
 // GET /api/conversations — list all conversations
-export async function GET() {
+export async function GET(request: Request) {
   const supabase = await createClient();
   const {
     data: { user },
@@ -13,7 +13,27 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const { searchParams } = new URL(request.url);
+  const startDate = searchParams.get("startDate");
+  const endDate = searchParams.get("endDate");
+
+  const where: Record<string, unknown> = {};
+  const createdAtFilter: Record<string, Date> = {};
+
+  if (startDate) {
+    createdAtFilter.gte = new Date(startDate);
+  }
+
+  if (endDate) {
+    createdAtFilter.lte = new Date(endDate);
+  }
+
+  if (Object.keys(createdAtFilter).length > 0) {
+    where.createdAt = createdAtFilter;
+  }
+
   const conversations = await prisma.conversation.findMany({
+    where,
     include: {
       messages: {
         orderBy: { timestamp: "asc" },

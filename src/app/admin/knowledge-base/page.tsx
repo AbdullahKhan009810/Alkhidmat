@@ -175,6 +175,17 @@ function EntryModal({
   );
 }
 
+/* ── Time Filter Presets ─────────────────────────────── */
+type Preset = "all" | "today" | "7d" | "30d" | "custom";
+
+const TIME_PRESETS = [
+  { id: "all" as const, label: "All Time" },
+  { id: "today" as const, label: "Today" },
+  { id: "7d" as const, label: "Last 7 Days" },
+  { id: "30d" as const, label: "Last 30 Days" },
+  { id: "custom" as const, label: "Custom" },
+];
+
 /* ── Knowledge Base Page ──────────────────────────────── */
 export default function KnowledgeBasePage() {
   const [entries, setEntries] = useState<KBEntry[]>([]);
@@ -185,6 +196,11 @@ export default function KnowledgeBasePage() {
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 10;
 
+  // Time filter state
+  const [activePreset, setActivePreset] = useState<Preset>("all");
+  const [customStart, setCustomStart] = useState("");
+  const [customEnd, setCustomEnd] = useState("");
+
   // Upload state
   const [showUpload, setShowUpload] = useState(false);
   const [uploadCategory, setUploadCategory] = useState("");
@@ -193,22 +209,55 @@ export default function KnowledgeBasePage() {
   const [uploadContent, setUploadContent] = useState("");
   const [uploading, setUploading] = useState(false);
 
-  useEffect(() => {
-    async function fetchEntries() {
-      try {
-        const res = await fetch("/api/knowledge-base");
-        if (!res.ok) throw new Error("Failed to fetch");
-        const data = await res.json();
-        // Temporarily show all data to see what's in Supabase
-        setEntries(data);
-      } catch (err) {
-        console.error("Error fetching knowledge base:", err);
-      } finally {
-        setLoading(false);
-      }
+  async function fetchEntries(start?: string, end?: string) {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams();
+      if (activeCategory !== "all") params.set("category", activeCategory);
+      if (search) params.set("search", search);
+      if (start) params.set("startDate", start);
+      if (end) params.set("endDate", end);
+      const qs = params.toString();
+      const res = await fetch(`/api/knowledge-base${qs ? `?${qs}` : ""}`);
+      if (!res.ok) throw new Error("Failed to fetch");
+      const data = await res.json();
+      setEntries(data);
+      setCurrentPage(1);
+    } catch (err) {
+      console.error("Error fetching knowledge base:", err);
+    } finally {
+      setLoading(false);
     }
+  }
+
+  useEffect(() => {
     fetchEntries();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const applyPreset = (preset: Preset) => {
+    setActivePreset(preset);
+    if (preset === "all") {
+      fetchEntries();
+    } else if (preset === "today") {
+      const today = new Date().toISOString().split("T")[0];
+      fetchEntries(today, today);
+    } else if (preset === "7d") {
+      const end = new Date().toISOString().split("T")[0];
+      const start = new Date(Date.now() - 7 * 86400000).toISOString().split("T")[0];
+      fetchEntries(start, end);
+    } else if (preset === "30d") {
+      const end = new Date().toISOString().split("T")[0];
+      const start = new Date(Date.now() - 30 * 86400000).toISOString().split("T")[0];
+      fetchEntries(start, end);
+    }
+  };
+
+  const applyCustomRange = () => {
+    if (customStart || customEnd) {
+      fetchEntries(customStart || undefined, customEnd || undefined);
+    }
+  };
 
   const filtered = entries.filter((entry) => {
     const matchSearch =
@@ -298,10 +347,7 @@ export default function KnowledgeBasePage() {
       setUploadContent("");
 
       // Refresh entries
-      const res = await fetch("/api/knowledge-base");
-      const data = await res.json();
-      setEntries(data);
-      setCurrentPage(1);
+      await fetchEntries();
     } catch (err) {
       console.error("Upload error:", err);
       alert(err instanceof Error ? err.message : "Upload failed");
@@ -374,8 +420,47 @@ export default function KnowledgeBasePage() {
         </button>
       </div>
 
-      {/* ── Entries Table ──────────────────────────────── */}
+      {/* ─ Entries Table ──────────────────────────────── */}
       <div className="mt-4 rounded-xl border border-gray-200 bg-white">
+        <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
+          <h2 className="text-base font-semibold text-gray-900">Knowledge Base Entries</h2>
+          <div className="flex items-center gap-2">
+            {activePreset === "custom" && (
+              <>
+                <input
+                  type="date"
+                  value={customStart}
+                  onChange={(e) => setCustomStart(e.target.value)}
+                  className="rounded-lg border border-gray-200 px-2 py-1.5 text-xs text-gray-700 outline-none focus:border-[#005A9E] focus:ring-1 focus:ring-[#005A9E]"
+                />
+                <span className="text-xs text-gray-400">to</span>
+                <input
+                  type="date"
+                  value={customEnd}
+                  onChange={(e) => setCustomEnd(e.target.value)}
+                  className="rounded-lg border border-gray-200 px-2 py-1.5 text-xs text-gray-700 outline-none focus:border-[#005A9E] focus:ring-1 focus:ring-[#005A9E]"
+                />
+                <button
+                  onClick={applyCustomRange}
+                  className="rounded-lg bg-[#005A9E] px-2.5 py-1.5 text-xs font-medium text-white hover:bg-[#004a82]"
+                >
+                  Apply
+                </button>
+              </>
+            )}
+            <select
+              value={activePreset}
+              onChange={(e) => applyPreset(e.target.value as Preset)}
+              className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 outline-none focus:border-[#005A9E] focus:ring-1 focus:ring-[#005A9E]"
+            >
+              {TIME_PRESETS.map((preset) => (
+                <option key={preset.id} value={preset.id}>
+                  {preset.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
         <div className="overflow-x-auto">
           {loading ? (
             <div className="flex items-center justify-center py-12">

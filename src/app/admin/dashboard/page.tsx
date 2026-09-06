@@ -10,6 +10,7 @@ import {
   Bot,
   X,
   Loader2,
+  Download,
 } from "lucide-react";
 import AdminShell from "@/components/AdminShell";
 
@@ -27,6 +28,44 @@ interface Conversation {
   status: string;
   createdAt: string;
   messages: ConversationMessage[];
+}
+
+/* ── Export Helper ────────────────────────────────────── */
+function buildTranscriptText(conv: Conversation): string {
+  const lines: string[] = [];
+  lines.push(`Session ID: ${conv.sessionId}`);
+  lines.push(`Language: ${conv.language === "ur" ? "Urdu" : "English"}`);
+  lines.push(`Date: ${new Date(conv.createdAt).toLocaleString()}`);
+  lines.push(`Messages: ${conv.messages.length}`);
+  lines.push("=".repeat(50));
+  lines.push("");
+
+  for (const msg of conv.messages) {
+    const time = new Date(msg.timestamp).toLocaleTimeString("en-US", {
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    });
+    const role = msg.role === "user" ? "User" : "Bot";
+    lines.push(`[${time}] ${role}:`);
+    lines.push(msg.content);
+    lines.push("");
+  }
+
+  return lines.join("\n");
+}
+
+function downloadTranscript(conv: Conversation) {
+  const text = buildTranscriptText(conv);
+  const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `transcript-${conv.sessionId}.txt`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }
 
 /* ── Transcript Modal Component ───────────────────────── */
@@ -125,17 +164,37 @@ function TranscriptModal({
           <span className="text-xs text-gray-400">
             {conversation.messages.length} messages
           </span>
-          <button
-            onClick={onClose}
-            className="rounded-lg bg-[#005A9E] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#004a82]"
-          >
-            Close
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => downloadTranscript(conversation)}
+              className="flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-2 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-50"
+            >
+              <Download className="h-3.5 w-3.5" />
+              Export .txt
+            </button>
+            <button
+              onClick={onClose}
+              className="rounded-lg bg-[#005A9E] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#004a82]"
+            >
+              Close
+            </button>
+          </div>
         </div>
       </div>
     </div>
   );
 }
+
+/* ── Time Filter Presets ─────────────────────────────── */
+type Preset = "all" | "today" | "7d" | "30d" | "custom";
+
+const TIME_PRESETS = [
+  { id: "all" as const, label: "All Time" },
+  { id: "today" as const, label: "Today" },
+  { id: "7d" as const, label: "Last 7 Days" },
+  { id: "30d" as const, label: "Last 30 Days" },
+  { id: "custom" as const, label: "Custom" },
+];
 
 /* ── Dashboard Page ───────────────────────────────────── */
 export default function DashboardPage() {
@@ -145,21 +204,58 @@ export default function DashboardPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 10;
 
-  useEffect(() => {
-    async function fetchConversations() {
-      try {
-        const res = await fetch("/api/conversations");
-        if (!res.ok) throw new Error("Failed to fetch");
-        const data = await res.json();
-        setConversations(data);
-      } catch (err) {
-        console.error("Error fetching conversations:", err);
-      } finally {
-        setLoading(false);
-      }
+  // Time filter state
+  const [activePreset, setActivePreset] = useState<Preset>("all");
+  const [customStart, setCustomStart] = useState("");
+  const [customEnd, setCustomEnd] = useState("");
+
+  async function fetchConversations(start?: string, end?: string) {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams();
+      if (start) params.set("startDate", start);
+      if (end) params.set("endDate", end);
+      const qs = params.toString();
+      const res = await fetch(`/api/conversations${qs ? `?${qs}` : ""}`);
+      if (!res.ok) throw new Error("Failed to fetch");
+      const data = await res.json();
+      setConversations(data);
+      setCurrentPage(1);
+    } catch (err) {
+      console.error("Error fetching conversations:", err);
+    } finally {
+      setLoading(false);
     }
+  }
+
+  useEffect(() => {
     fetchConversations();
   }, []);
+
+  const applyPreset = (preset: Preset) => {
+    setActivePreset(preset);
+    if (preset === "all") {
+      fetchConversations();
+    } else if (preset === "today") {
+      const today = new Date().toISOString().split("T")[0];
+      fetchConversations(today, today);
+    } else if (preset === "7d") {
+      const end = new Date().toISOString().split("T")[0];
+      const start = new Date(Date.now() - 7 * 86400000).toISOString().split("T")[0];
+      fetchConversations(start, end);
+    } else if (preset === "30d") {
+      const end = new Date().toISOString().split("T")[0];
+      const start = new Date(Date.now() - 30 * 86400000).toISOString().split("T")[0];
+      fetchConversations(start, end);
+    }
+    // custom does nothing until user picks dates and clicks Apply
+  };
+
+  const applyCustomRange = () => {
+    if (customStart || customEnd) {
+      fetchConversations(customStart || undefined, customEnd || undefined);
+    }
+  };
 
   const getPreview = (conv: Conversation) => {
     const firstMsg = conv.messages.find((m) => m.role === "user");
@@ -185,7 +281,7 @@ export default function DashboardPage() {
       pageTitle="Dashboard"
       pageSubtitle="Manage welfare cases and voice assistant transcripts"
     >
-      {/* ── Two cards row ──────────────────────────── */}
+      {/* ── Two cards row ─────────────────────────── */}
       <div className="mt-6 grid grid-cols-1 gap-5 lg:grid-cols-2">
         {/* Cases card */}
         <div className="rounded-xl border border-gray-200 bg-white p-6">
@@ -260,10 +356,46 @@ export default function DashboardPage() {
 
       {/* ── Recent Conversations table ─────────────── */}
       <div className="mt-6 rounded-xl border border-gray-200 bg-white">
-        <div className="border-b border-gray-200 px-6 py-4">
+        <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
           <h2 className="text-base font-semibold text-gray-900">
             Recent Conversations
           </h2>
+          <div className="flex items-center gap-2">
+            {activePreset === "custom" && (
+              <>
+                <input
+                  type="date"
+                  value={customStart}
+                  onChange={(e) => setCustomStart(e.target.value)}
+                  className="rounded-lg border border-gray-200 px-2 py-1.5 text-xs text-gray-700 outline-none focus:border-[#005A9E] focus:ring-1 focus:ring-[#005A9E]"
+                />
+                <span className="text-xs text-gray-400">to</span>
+                <input
+                  type="date"
+                  value={customEnd}
+                  onChange={(e) => setCustomEnd(e.target.value)}
+                  className="rounded-lg border border-gray-200 px-2 py-1.5 text-xs text-gray-700 outline-none focus:border-[#005A9E] focus:ring-1 focus:ring-[#005A9E]"
+                />
+                <button
+                  onClick={applyCustomRange}
+                  className="rounded-lg bg-[#005A9E] px-2.5 py-1.5 text-xs font-medium text-white hover:bg-[#004a82]"
+                >
+                  Apply
+                </button>
+              </>
+            )}
+            <select
+              value={activePreset}
+              onChange={(e) => applyPreset(e.target.value as Preset)}
+              className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 outline-none focus:border-[#005A9E] focus:ring-1 focus:ring-[#005A9E]"
+            >
+              {TIME_PRESETS.map((preset) => (
+                <option key={preset.id} value={preset.id}>
+                  {preset.label}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
         <div className="overflow-x-auto">
           {loading ? (
@@ -306,12 +438,22 @@ export default function DashboardPage() {
                       {row.messages.length}
                     </td>
                     <td className="px-6 py-4 text-right">
-                      <button
-                        className="text-[#005A9E] hover:text-[#004a82]"
-                        onClick={() => setSelectedTranscript(row)}
-                      >
-                        <Eye className="h-4 w-4" />
-                      </button>
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          className="text-gray-400 hover:text-[#005A9E]"
+                          onClick={() => downloadTranscript(row)}
+                          title="Export as .txt"
+                        >
+                          <Download className="h-4 w-4" />
+                        </button>
+                        <button
+                          className="text-[#005A9E] hover:text-[#004a82]"
+                          onClick={() => setSelectedTranscript(row)}
+                          title="View transcript"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}

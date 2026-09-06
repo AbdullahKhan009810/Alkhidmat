@@ -17,10 +17,11 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const category = searchParams.get("category");
   const search = searchParams.get("search");
+  const startDate = searchParams.get("startDate");
+  const endDate = searchParams.get("endDate");
 
   const where: Record<string, unknown> = {};
 
-  // Temporarily show all data to see what's in Supabase
   if (category && category !== "all") {
     where.category = category;
   }
@@ -31,6 +32,20 @@ export async function GET(request: Request) {
       { titleUr: { contains: search } },
       { id: { contains: search, mode: "insensitive" } },
     ];
+  }
+
+  const lastUpdatedFilter: Record<string, Date> = {};
+
+  if (startDate) {
+    lastUpdatedFilter.gte = new Date(startDate);
+  }
+
+  if (endDate) {
+    lastUpdatedFilter.lte = new Date(endDate);
+  }
+
+  if (Object.keys(lastUpdatedFilter).length > 0) {
+    where.lastUpdated = lastUpdatedFilter;
   }
 
   const entries = await prisma.knowledgeBaseEntry.findMany({
