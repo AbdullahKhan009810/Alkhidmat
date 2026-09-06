@@ -144,11 +144,11 @@ export default function AdminShell({
             {profileOpen && (
               <>
                 <div className="fixed inset-0 z-30" onClick={() => setProfileOpen(false)} />
-                <div className="absolute right-0 mt-2 w-44 rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
+                <div className="absolute right-0 z-50 mt-2 w-44 rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
                   <button
-                    onClick={() => {
+                    onClick={async () => {
                       setProfileOpen(false);
-                      handleLogout();
+                      await handleLogout();
                     }}
                     className="flex w-full items-center gap-2 px-4 py-2 text-sm text-gray-700 transition-colors hover:bg-gray-50"
                   >

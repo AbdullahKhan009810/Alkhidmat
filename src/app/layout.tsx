@@ -17,6 +17,9 @@ export const metadata: Metadata = {
   title: "Muawin — Voice Welfare Assistant",
   description:
     "Voice-powered welfare assistance in English and Urdu by Al Khidmat Foundation.",
+  icons: {
+    icon: "/awaz-mark.png",
+  },
 };
 
 export default function RootLayout({
