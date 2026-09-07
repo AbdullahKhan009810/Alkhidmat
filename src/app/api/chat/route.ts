@@ -126,7 +126,7 @@ function smallTalkAnswer(
   if (!t || t.length > 60) return null;
 
   const urdu = language === "ur" || (!language && /[\u0600-\u06FF]/.test(t));
-  const offTopicUr = "میں الخدمت فاؤنڈیشن کی وائس اسسٹنٹ ہوں — میں صرف الخدمت کی بہبودی خدمات کے بارے میں معلومات دے سکتی ہوں۔ براہِ کرم دوسری مدد کے لیے الخدمت ہیلپ لائن 051-4853951 پر کال کریں۔";
+  const offTopicUr = "میں الخدمت فاؤنڈیشن کا وائس اسسٹنٹ ہوں — میں صرف الخدمت کی بہبودی خدمات کے بارے میں معلومات دے سکتا ہوں۔ براہِ کرم دوسری مدد کے لیے الخدمت ہیلپ لائن 051-4853951 پر کال کریں۔";
   const offTopicEn = "I'm a voice assistant for Al Khidmat Foundation — I can only help with information about our welfare services. Please call our helpline at 051-4853951 for other assistance.";
 
   // Intent probes (Urdu script, Roman Urdu, English)
@@ -177,9 +177,9 @@ function smallTalkAnswer(
   if (urdu) {
     if (howAreYou) return "میں بالکل ٹھیک ہوں، شکریہ! آپ کیسے ہیں؟";
     if (identity)
-      return "میں معاون ہوں، الخدمت فاؤنڈیشن کی وائس اسسٹنٹ ہوں۔ میں ہسپتال، مفت علاج اور ایمبولینس کے بارے میں رہنمائی دے سکتی ہوں۔";
+      return "میں معاون ہوں، الخدمت فاؤنڈیشن کا وائس اسسٹنٹ ہوں۔ میں ہسپتال، مفت علاج اور ایمبولینس کے بارے میں رہنمائی دے سکتا ہوں۔";
     if (alreadyGreeted) return "جی ہاں، میں یہاں ہوں — بتائیں کیا مدد چاہیے؟";
-    return "و علیکم السلام! میں الخدمت فاؤنڈیشن سے بات کر رہی ہوں۔ بتائیں، میں آپ کی کیا مدد کر سکتی ہوں؟";
+    return "و علیکم السلام! میں الخدمت فاؤنڈیشن سے بات کر رہا ہوں۔ بتائیں، میں آپ کی کیا مدد کر سکتا ہوں؟";
   }
   if (howAreYou) return "I'm doing great, thank you! How about you?";
   if (identity)
@@ -197,13 +197,13 @@ function smallTalkPrompt(language: string): string {
   const fallback = language === "ur" ? HELPLINE_FALLBACK_UR : HELPLINE_FALLBACK_EN;
   const isUrdu = language === "ur";
   const genderRule = isUrdu
-    ? "Use FEMININE Urdu grammar throughout: کرتی ہوں, بتاتی ہوں, سکتی ہوں, رہی ہوں (never masculine forms like کرتا/بتاتا/سکتا/رہا). You are a female assistant named Fatima."
+    ? "Use MASCULINE Urdu grammar: کرتا ہوں, بتاتا ہوں, سکتا ہوں, رہا ہوں (never feminine کرتی/بتاتی/سکتی/رہی)."
     : "Use warm, friendly phrasing.";
   const nameNote = isUrdu
     ? "Your name is معاون. Always write it as معاون — NEVER as مبین or any other spelling. Never include spelling guides or letter breakdowns."
     : "Your name is Muawin.";
   const clarificationMsg = isUrdu
-    ? "براہ کرم بتائیں میں آپ کی کیا مدد کر سکتی ہوں؟ میں الخدمت کی بہبودی خدمات کے بارے میں معلومات دے سکتی ہوں۔"
+    ? "براہ کرم بتائیں میں آپ کی کیا مدد کر سکتا ہوں؟ میں الخدمت کی بہبودی خدمات کے بارے میں معلومات دے سکتا ہوں۔"
     : "Could you please clarify what you need help with? I can assist with Al Khidmat's welfare services.";
   const langRule = isUrdu
     ? "LANGUAGE: You MUST respond in Urdu only. Never switch to English. All responses must be in Urdu script."
@@ -271,7 +271,7 @@ function systemPrompt(context: string, language: string = "en"): string {
   const isUrdu = language === "ur";
   const botNameUrdu = "معاون";
   const genderRule = isUrdu
-    ? "Use FEMININE Urdu grammar throughout: کرتی ہوں, بتاتی ہوں, سکتی ہوں, رہی ہوں (never masculine forms like کرتا/بتاتا/سکتا/رہا). You are a female assistant named Fatima."
+    ? "Use MASCULINE Urdu grammar throughout: کرتا ہوں, بتاتا ہوں, سکتا ہوں, رہا ہوں (never feminine forms like کرتی/بتاتی/سکتی/رہی)."
     : "Use warm, friendly phrasing.";
   const nameNote = isUrdu
     ? "Your name is معاون — always write it this way. NEVER write مبین. NEVER include spelling guides, letter breakdowns, or pronunciation hints."

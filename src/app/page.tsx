@@ -35,10 +35,10 @@ function normalizeUrdu(text: string): string {
     .replace(/مبین/g, "معاون");
 }
 
-/** Greeting spoken when a call starts (feminine Urdu for female persona Fatima) */
+/** Greeting spoken when a call starts */
 const GREETINGS: Record<Language, string> = {
   en: "Assalam o Alaikum! This is Fatima from Al Khidmat Foundation. How can I help you?",
-  ur: "السلام علیکم! میں الخدمت فاؤنڈیشن سے بات کر رہی ہوں۔ میں آپ کی کیا مدد کر سکتی ہوں؟",
+  ur: "السلام علیکم! میں الخدمت فاؤنڈیشن سے بات کر رہا ہوں۔ میں آپ کی کیا مدد کر سکتا ہوں؟",
 };
 
 export default function Home() {
@@ -224,10 +224,17 @@ export default function Home() {
         content: m.content,
       }));
 
+      // Auto-detect language from user's actual input — if they type/speak
+      // Urdu script, respond in Urdu; otherwise respond in English.
+      // This prevents language mismatches when the user speaks a different
+      // language than their UI selection.
+      const hasUrduScript = /[\u0600-\u06FF]/.test(text);
+      const effectiveLang: Language = hasUrduScript ? "ur" : "en";
+
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: text, language: languageRef.current, stream: true, history }),
+        body: JSON.stringify({ message: text, language: effectiveLang, stream: true, history }),
       });
       if (!res.ok || !res.body) {
         console.error("Chat request failed:", res.status);
@@ -265,7 +272,7 @@ export default function Home() {
               for (const sentence of flushed.sentences) {
                 // Stop speaking if call ended
                 if (!callActiveRef.current && !mutedRef.current) break;
-                speak(normalizeUrdu(sentence), languageRef.current);
+                speak(normalizeUrdu(sentence), effectiveLang);
               }
             }
           } catch {
@@ -277,7 +284,7 @@ export default function Home() {
       // Speak anything left after the stream ends (only if call still active)
       const final = unspokenBuffer.trim();
       if (final && (callActiveRef.current || mutedRef.current)) {
-        speak(normalizeUrdu(final), languageRef.current);
+        speak(normalizeUrdu(final), effectiveLang);
       }
       if (fullAnswer.trim()) {
         pushBotMessage(normalizeUrdu(fullAnswer.trim()));
