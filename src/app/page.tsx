@@ -60,6 +60,11 @@ export default function Home() {
   const ttsChainRef = useRef<Promise<void>>(Promise.resolve());
   const audioGenerationRef = useRef(0);
   const ttsAbortRef = useRef<AbortController | null>(null);
+  const currentPlaybackRef = useRef<HTMLAudioElement | null>(null);
+  const resolvePlaybackRef = useRef<(() => void) | null>(null);
+  const botSpeakingRef = useRef(false);
+  const pendingSpeaksRef = useRef(0);
+  const botSpeakingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   callActiveRef.current = callStatus === "listening" && !muted;
 
   /* Mirror of messages state — lets handleChat read the latest turns without
@@ -81,21 +86,45 @@ export default function Home() {
   const playNextAudio = useCallback(async () => {
     if (playingRef.current) return;
     const next = audioQueueRef.current.shift();
-    if (!next) return;
+    if (!next) {
+      // Queue empty — if no more TTS tasks pending, debounce mic reopen
+      if (pendingSpeaksRef.current <= 0) {
+        if (botSpeakingTimeoutRef.current) clearTimeout(botSpeakingTimeoutRef.current);
+        botSpeakingTimeoutRef.current = setTimeout(() => {
+          // Only close if nothing new started during the debounce window
+          if (pendingSpeaksRef.current <= 0 && !playingRef.current) {
+            botSpeakingRef.current = false;
+          }
+          botSpeakingTimeoutRef.current = null;
+        }, 1500);
+      }
+      return;
+    }
+
+    // Skip playback if call has ended (unless muted — then just drain queue)
+    if (!callActiveRef.current && !muted) {
+      if (next.startsWith("blob:")) URL.revokeObjectURL(next);
+      playNextAudio(); // drain remaining clips
+      return;
+    }
 
     playingRef.current = true;
     try {
       const audio = new Audio(next);
       audioRef.current = audio;
+      currentPlaybackRef.current = audio;
       await new Promise<void>((resolve) => {
-        audio.onended = () => resolve();
-        audio.onerror = () => resolve();
-        audio.play().catch(() => resolve());
+        resolvePlaybackRef.current = resolve;
+        audio.onended = () => { resolvePlaybackRef.current = null; resolve(); };
+        audio.onerror = () => { resolvePlaybackRef.current = null; resolve(); };
+        audio.play().catch(() => { resolvePlaybackRef.current = null; resolve(); });
       });
       if (next.startsWith("blob:")) {
         URL.revokeObjectURL(next);
       }
     } finally {
+      resolvePlaybackRef.current = null;
+      currentPlaybackRef.current = null;
       playingRef.current = false;
       playNextAudio();
     }
@@ -104,9 +133,18 @@ export default function Home() {
   /** Fetch TTS audio in sentence order and enqueue it for sequential playback */
   const speak = useCallback((text: string, locale: Language) => {
     const generation = audioGenerationRef.current;
+    pendingSpeaksRef.current += 1;
+    botSpeakingRef.current = true;
+    // Cancel any pending debounce — bot is speaking again
+    if (botSpeakingTimeoutRef.current) {
+      clearTimeout(botSpeakingTimeoutRef.current);
+      botSpeakingTimeoutRef.current = null;
+    }
 
     const task = ttsChainRef.current.then(async () => {
       if (generation !== audioGenerationRef.current) return;
+      // Don't fetch TTS if call has ended (unless muted)
+      if (!callActiveRef.current && !muted) return;
 
       try {
         const res = await fetch("/api/tts", {
@@ -128,6 +166,18 @@ export default function Home() {
         if ((err as Error).name !== "AbortError") {
           console.error("TTS playback failed:", err);
         }
+      }
+    }).finally(() => {
+      pendingSpeaksRef.current -= 1;
+      // All TTS fetches done and nothing playing — debounce mic reopen
+      if (pendingSpeaksRef.current <= 0 && audioQueueRef.current.length === 0 && !playingRef.current) {
+        if (botSpeakingTimeoutRef.current) clearTimeout(botSpeakingTimeoutRef.current);
+        botSpeakingTimeoutRef.current = setTimeout(() => {
+          if (pendingSpeaksRef.current <= 0 && !playingRef.current) {
+            botSpeakingRef.current = false;
+          }
+          botSpeakingTimeoutRef.current = null;
+        }, 1500);
       }
     });
 
@@ -153,6 +203,8 @@ export default function Home() {
 
   /** Stream the bot reply and speak complete sentences as they arrive */
   const handleChat = useCallback(async (text: string) => {
+    // Guard: don't process if call has ended
+    if (!callActiveRef.current && !muted) return;
     try {
       // Recent turns give the brain context (follow-ups like "and in Pindi?")
       const prior = [...messagesRef.current];
@@ -183,6 +235,8 @@ export default function Home() {
       setStreamingText("");
 
       while (true) {
+        // Stop streaming if call has ended
+        if (!callActiveRef.current && !muted) break;
         const { done, value } = await reader.read();
         if (done) break;
         buffer += decoder.decode(value, { stream: true });
@@ -202,6 +256,8 @@ export default function Home() {
               const flushed = flushSentences(unspokenBuffer);
               unspokenBuffer = flushed.remaining;
               for (const sentence of flushed.sentences) {
+                // Stop speaking if call ended
+                if (!callActiveRef.current && !muted) break;
                 speak(normalizeUrdu(sentence), language);
               }
             }
@@ -211,9 +267,9 @@ export default function Home() {
         }
       }
 
-      // Speak anything left after the stream ends
+      // Speak anything left after the stream ends (only if call still active)
       const final = unspokenBuffer.trim();
-      if (final) {
+      if (final && (callActiveRef.current || muted)) {
         speak(normalizeUrdu(final), language);
       }
       if (fullAnswer.trim()) {
@@ -222,6 +278,14 @@ export default function Home() {
       setStreamingText("");
     } catch (err) {
       console.error("Chat request failed:", err);
+    } finally {
+      // Safety net: if speak() was never called (e.g. empty/error response),
+      // ensure botSpeakingRef resets after a short delay
+      setTimeout(() => {
+        if (pendingSpeaksRef.current <= 0 && !playingRef.current) {
+          botSpeakingRef.current = false;
+        }
+      }, 2000);
     }
   }, [language, speak, pushBotMessage]);
 
@@ -285,8 +349,8 @@ export default function Home() {
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     rec.onresult = (e: any) => {
-      // Ignore all user speech while bot is speaking
-      if (playingRef.current) return;
+      // Block input if call ended or bot is speaking (echo protection)
+      if (!callActiveRef.current || botSpeakingRef.current || playingRef.current) return;
 
       const last = e.results[e.results.length - 1];
       const text = String(last[0]?.transcript || "").trim();
@@ -314,7 +378,9 @@ export default function Home() {
     };
 
     // Chrome stops after silence — keep restarting while the call is live
+    let cleaned = false;
     rec.onend = () => {
+      if (cleaned) return;
       if (callActiveRef.current) {
         try {
           rec.start();
@@ -331,9 +397,17 @@ export default function Home() {
     }
 
     return () => {
+      cleaned = true;
+      rec.onresult = null;
+      rec.onerror = null;
       rec.onend = null;
       try {
         rec.stop();
+      } catch {
+        /* ignore */
+      }
+      try {
+        rec.abort();
       } catch {
         /* ignore */
       }
@@ -405,7 +479,26 @@ export default function Home() {
       ttsAbortRef.current?.abort();
       ttsAbortRef.current = null;
 
-      // Fully stop current audio playback
+      // Reset echo-protection flags
+      botSpeakingRef.current = false;
+      pendingSpeaksRef.current = 0;
+      if (botSpeakingTimeoutRef.current) {
+        clearTimeout(botSpeakingTimeoutRef.current);
+        botSpeakingTimeoutRef.current = null;
+      }
+
+      // Resolve the stuck playNextAudio promise so its finally block runs
+      resolvePlaybackRef.current?.();
+      resolvePlaybackRef.current = null;
+
+      // Stop the audio currently playing inside playNextAudio
+      if (currentPlaybackRef.current) {
+        currentPlaybackRef.current.pause();
+        currentPlaybackRef.current.currentTime = 0;
+        currentPlaybackRef.current = null;
+      }
+
+      // Fully stop current audio playback (greeting / first clip)
       if (audioRef.current) {
         audioRef.current.pause();
         audioRef.current.currentTime = 0;
