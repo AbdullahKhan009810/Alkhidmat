@@ -35,10 +35,10 @@ function normalizeUrdu(text: string): string {
     .replace(/مبین/g, "معاون");
 }
 
-/** Greeting spoken when a call starts (masculine Urdu for male voice, feminine English for female voice) */
+/** Greeting spoken when a call starts (feminine Urdu for female persona Fatima) */
 const GREETINGS: Record<Language, string> = {
   en: "Assalam o Alaikum! This is Fatima from Al Khidmat Foundation. How can I help you?",
-  ur: "السلام علیکم! میں الخدمت فاؤنڈیشن سے بات کر رہا ہوں۔ میں آپ کی کیا مدد کر سکتا ہوں؟",
+  ur: "السلام علیکم! میں الخدمت فاؤنڈیشن سے بات کر رہی ہوں۔ میں آپ کی کیا مدد کر سکتی ہوں؟",
 };
 
 export default function Home() {
