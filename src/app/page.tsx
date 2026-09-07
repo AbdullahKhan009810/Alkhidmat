@@ -65,6 +65,7 @@ export default function Home() {
   const botSpeakingRef = useRef(false);
   const pendingSpeaksRef = useRef(0);
   const botSpeakingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const recRestartTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const recRef = useRef<any>(null);
   callActiveRef.current = callStatus === "listening" && !muted;
@@ -96,13 +97,9 @@ export default function Home() {
           // Only reopen if nothing new started during the debounce window
           if (pendingSpeaksRef.current <= 0 && !playingRef.current) {
             botSpeakingRef.current = false;
-            // Restart mic now that bot is done speaking
-            if (recRef.current && callActiveRef.current) {
-              try { recRef.current.start(); } catch { /* ignore */ }
-            }
           }
           botSpeakingTimeoutRef.current = null;
-        }, 1500);
+        }, 4000);
       }
       return;
     }
@@ -150,6 +147,14 @@ export default function Home() {
     if (recRef.current) {
       try { recRef.current.stop(); } catch { /* ignore */ }
     }
+    // Restart recognition after a short delay so it's ready when user responds,
+    // but botSpeakingRef stays true for 4s to block any echo results
+    if (recRestartTimeoutRef.current) clearTimeout(recRestartTimeoutRef.current);
+    recRestartTimeoutRef.current = setTimeout(() => {
+      if (recRef.current && callActiveRef.current) {
+        try { recRef.current.start(); } catch { /* ignore */ }
+      }
+    }, 1500);
 
     const task = ttsChainRef.current.then(async () => {
       if (generation !== audioGenerationRef.current) return;
@@ -185,13 +190,9 @@ export default function Home() {
         botSpeakingTimeoutRef.current = setTimeout(() => {
           if (pendingSpeaksRef.current <= 0 && !playingRef.current) {
             botSpeakingRef.current = false;
-            // Restart mic now that bot is done speaking
-            if (recRef.current && callActiveRef.current) {
-              try { recRef.current.start(); } catch { /* ignore */ }
-            }
           }
           botSpeakingTimeoutRef.current = null;
-        }, 1500);
+        }, 4000);
       }
     });
 
@@ -503,6 +504,10 @@ export default function Home() {
       if (botSpeakingTimeoutRef.current) {
         clearTimeout(botSpeakingTimeoutRef.current);
         botSpeakingTimeoutRef.current = null;
+      }
+      if (recRestartTimeoutRef.current) {
+        clearTimeout(recRestartTimeoutRef.current);
+        recRestartTimeoutRef.current = null;
       }
 
       // Resolve the stuck playNextAudio promise so its finally block runs
