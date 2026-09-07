@@ -123,11 +123,29 @@ function preprocessForTTS(text: string, language: string): string {
   processed = processed.replace(/\bBP\b/g, "B P");
 
   // Spell out phone numbers and emergency digits so TTS reads digit-by-digit
-  // "1122" → "1 1 2 2", "051-4853951" → "0 5 1 4 8 5 3 9 5 1"
-  processed = processed.replace(/\b1122\b/g, "1 1 2 2");
+  // "1122" → "1 1, 2 2", "051-4853951" → "0 5 1, 4 8 5, 3 9 5 1"
+  processed = processed.replace(/\b1122\b/g, "1 1, 2 2");
   // Phone numbers with dashes: NNN-NNNNNNN+ (e.g. 051-4853951, 0300-1234567)
-  processed = processed.replace(/\b(\d{2,})-(\d{4,})\b/g, (_m, a, b) => {
-    return (a + " " + b).replace(/\d/g, (d: string) => d + " ").trim();
+  // Group digits in 2-3s with commas for natural pausing
+  processed = processed.replace(/\b(\d{2,})-(\d{4,})\b/g, (_m, a: string, b: string) => {
+    const groupDigits = (s: string) => {
+      const digits = s.split("");
+      const groups: string[] = [];
+      for (let i = 0; i < digits.length; i += 3) {
+        groups.push(digits.slice(i, i + 3).join(" "));
+      }
+      return groups.join(", ");
+    };
+    return groupDigits(a) + ", " + groupDigits(b);
+  });
+  // Standalone long digit sequences (e.g. "03001234567")
+  processed = processed.replace(/\b(\d{6,})\b/g, (_m, d: string) => {
+    const digits = d.split("");
+    const groups: string[] = [];
+    for (let i = 0; i < digits.length; i += 3) {
+      groups.push(digits.slice(i, i + 3).join(" "));
+    }
+    return groups.join(", ");
   });
 
   if (language === "ur") {
@@ -195,7 +213,7 @@ async function synthesizeWithElevenLabs(
   const body: Record<string, any> = {
     text,
     model_id: model,
-    voice_settings: { stability: 0.5, similarity_boost: 0.8 },
+    voice_settings: { stability: 0.5, similarity_boost: 0.8, speed: 0.85 },
   };
 
   if (dictId) {
