@@ -470,8 +470,29 @@ export default function Home() {
       const cached = greetingCacheRef.current[languageRef.current];
       if (cached) {
         // Pre-generated audio — plays instantly
+        // IMPORTANT: greeting plays outside speak() pipeline, so we must
+        // manually activate echo protection to prevent the mic from
+        // picking up the greeting and feeding it back as user input.
+        botSpeakingRef.current = true;
+        if (recRef.current) {
+          try { recRef.current.stop(); } catch { /* ignore */ }
+        }
         const greetingAudio = new Audio(cached);
         audioRef.current = greetingAudio;
+        greetingAudio.onended = () => {
+          // Greeting finished — start 8-second debounce then reopen mic
+          // (same logic as playNextAudio when queue is empty)
+          if (botSpeakingTimeoutRef.current) clearTimeout(botSpeakingTimeoutRef.current);
+          botSpeakingTimeoutRef.current = setTimeout(() => {
+            if (pendingSpeaksRef.current <= 0 && !playingRef.current) {
+              botSpeakingRef.current = false;
+              if (recRef.current && callActiveRef.current) {
+                try { recRef.current.start(); } catch { /* ignore */ }
+              }
+            }
+            botSpeakingTimeoutRef.current = null;
+          }, 8000);
+        };
         greetingAudio
           .play()
           .catch((err) => console.error("Greeting playback failed:", err));
