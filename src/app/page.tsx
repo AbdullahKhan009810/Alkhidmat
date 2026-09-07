@@ -113,7 +113,7 @@ export default function Home() {
     }
 
     // Skip playback if call has ended (unless muted — then just drain queue)
-    if (!callActiveRef.current && !muted) {
+    if (!callActiveRef.current && !mutedRef.current) {
       if (next.startsWith("blob:")) URL.revokeObjectURL(next);
       playNextAudio(); // drain remaining clips
       return;
@@ -351,7 +351,7 @@ export default function Home() {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const rec = new SR() as any;
     recRef.current = rec;
-    rec.lang = language === "ur" ? "ur-PK" : "en-US";
+    rec.lang = languageRef.current === "ur" ? "ur-PK" : "en-US";
     rec.continuous = true;
     rec.interimResults = true;
 
@@ -423,11 +423,12 @@ export default function Home() {
         /* ignore */
       }
     };
-  }, [callStatus, muted, language, handleChat, pushUserMessage]);
+  }, [callStatus, muted, handleChat, pushUserMessage]);
 
   /** Save conversation to database */
   const saveConversationToDB = useCallback(async () => {
-    if (messages.length === 0) return;
+    const msgs = messagesRef.current;
+    if (msgs.length === 0) return;
 
     try {
       const sessionId = `TR-${Date.now().toString(36).toUpperCase()}`;
@@ -436,8 +437,8 @@ export default function Home() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           sessionId,
-          language,
-          messages: messages.map((m) => ({
+          language: languageRef.current,
+          messages: msgs.map((m) => ({
             role: m.role,
             content: m.content,
           })),
@@ -454,7 +455,7 @@ export default function Home() {
       console.error("Failed to save conversation:", err);
       setToast({ message: `Error: ${err instanceof Error ? err.message : "Failed to save"}`, type: "error" });
     }
-  }, [language, messages]);
+  }, []);
 
   /** Toggle between idle ↔ listening on each click */
   const handleStartCall = useCallback(() => {
@@ -462,11 +463,11 @@ export default function Home() {
     if (callStatus === "idle") {
       // Create fresh abort controller for this call's TTS requests
       ttsAbortRef.current = new AbortController();
-      const greeting = GREETINGS[language];
+      const greeting = GREETINGS[languageRef.current];
       setMessages([
         { role: "bot", content: greeting, timestamp: getCurrentTime() },
       ]);
-      const cached = greetingCacheRef.current[language];
+      const cached = greetingCacheRef.current[languageRef.current];
       if (cached) {
         // Pre-generated audio — plays instantly
         const greetingAudio = new Audio(cached);
@@ -476,7 +477,7 @@ export default function Home() {
           .catch((err) => console.error("Greeting playback failed:", err));
       } else {
         // Not pre-warmed yet — fetch live
-        speak(greeting, language);
+        speak(greeting, languageRef.current);
       }
       setCallStatus("listening");
     } else {
@@ -522,7 +523,7 @@ export default function Home() {
       saveConversationToDB();
       setCallStatus("idle");
     }
-  }, [callStatus, language, speak, saveConversationToDB]);
+  }, [callStatus, speak, saveConversationToDB]);
 
   return (
     <div className="flex min-h-screen flex-col bg-white">
