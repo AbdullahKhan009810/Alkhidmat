@@ -110,7 +110,18 @@ function pcmToWav(pcm: Buffer, sampleRate: number): Buffer {
 function preprocessForTTS(text: string, language: string): string {
   let processed = text;
 
-  // Spell out common acronyms so TTS reads letter-by-letter instead of as a word
+  // ── Step 1: Convert Urdu/Arabic numerals to Latin digits ──
+  // LLM often outputs ۰۵۱-۴۸۵۳۹۵۱ instead of 051-4853951
+  const urduDigitMap: Record<string, string> = {
+    "\u06F0": "0", "\u06F1": "1", "\u06F2": "2", "\u06F3": "3", "\u06F4": "4",
+    "\u06F5": "5", "\u06F6": "6", "\u06F7": "7", "\u06F8": "8", "\u06F9": "9",
+    // Arabic-Indic digits (also used in Urdu text)
+    "\u0660": "0", "\u0661": "1", "\u0662": "2", "\u0663": "3", "\u0664": "4",
+    "\u0665": "5", "\u0666": "6", "\u0667": "7", "\u0668": "8", "\u0669": "9",
+  };
+  processed = processed.replace(/[\u06F0-\u06F9\u0660-\u0669]/g, (d) => urduDigitMap[d] || d);
+
+  // ── Step 2: Spell out common acronyms so TTS reads letter-by-letter ──
   processed = processed.replace(/\bCNIC\b/g, "C N I C");
   processed = processed.replace(/\bBISP\b/g, "B I S P");
   processed = processed.replace(/\bOPD\b/g, "O P D");
@@ -122,11 +133,11 @@ function preprocessForTTS(text: string, language: string): string {
   processed = processed.replace(/\bIV\b/g, "I V");
   processed = processed.replace(/\bBP\b/g, "B P");
 
-  // Spell out phone numbers and emergency digits so TTS reads digit-by-digit
-  // "1122" → "1 1, 2 2", "051-4853951" → "0 5 1, 4 8 5, 3 9 5 1"
+  // ── Step 3: Phone numbers & emergency digits — digit-by-digit with pauses ──
+  // "1122" → "1 1, 2 2"
   processed = processed.replace(/\b1122\b/g, "1 1, 2 2");
-  // Phone numbers with dashes: NNN-NNNNNNN+ (e.g. 051-4853951, 0300-1234567)
-  // Group digits in 2-3s with commas for natural pausing
+  // Phone numbers with dashes: NNN-NNNNNNN+ (e.g. 051-4853951)
+  // Group digits in 3s with commas for natural pausing
   processed = processed.replace(/\b(\d{2,})-(\d{4,})\b/g, (_m, a: string, b: string) => {
     const groupDigits = (s: string) => {
       const digits = s.split("");
@@ -138,7 +149,7 @@ function preprocessForTTS(text: string, language: string): string {
     };
     return groupDigits(a) + ", " + groupDigits(b);
   });
-  // Standalone long digit sequences (e.g. "03001234567")
+  // Standalone long digit sequences (e.g. 03001234567)
   processed = processed.replace(/\b(\d{6,})\b/g, (_m, d: string) => {
     const digits = d.split("");
     const groups: string[] = [];
@@ -148,13 +159,14 @@ function preprocessForTTS(text: string, language: string): string {
     return groups.join(", ");
   });
 
+  // ── Step 4: Language-specific replacements ──
   if (language === "ur") {
-    processed = processed.replace(/24\/7/g, "چوبیس گھنٹے");
+    processed = processed.replace(/24\s*[\/]\s*7/g, "چوبیس گھنٹے");
     processed = processed.replace(/\bDr\./g, "ڈاکٹر");
     processed = processed.replace(/\bMr\./g, "مسٹر");
     processed = processed.replace(/\bRs\./g, "روپے");
   } else {
-    processed = processed.replace(/24\/7/g, "twenty-four seven");
+    processed = processed.replace(/24\s*[\/]\s*7/g, "twenty-four seven");
     processed = processed.replace(/\bDr\./g, "Doctor");
     processed = processed.replace(/\bMr\./g, "Mister");
     processed = processed.replace(/\bRs\./g, "rupees");
