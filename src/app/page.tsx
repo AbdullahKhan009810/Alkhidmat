@@ -67,6 +67,11 @@ export default function Home() {
   const botSpeakingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const recRef = useRef<any>(null);
+  // Refs that stay in sync with state — used inside callbacks to avoid stale closures
+  const languageRef = useRef<Language>(language);
+  languageRef.current = language;
+  const mutedRef = useRef(muted);
+  mutedRef.current = muted;
   callActiveRef.current = callStatus === "listening" && !muted;
 
   /* Mirror of messages state — lets handleChat read the latest turns without
@@ -154,7 +159,7 @@ export default function Home() {
     const task = ttsChainRef.current.then(async () => {
       if (generation !== audioGenerationRef.current) return;
       // Don't fetch TTS if call has ended (unless muted)
-      if (!callActiveRef.current && !muted) return;
+      if (!callActiveRef.current && !mutedRef.current) return;
 
       try {
         const res = await fetch("/api/tts", {
@@ -188,8 +193,6 @@ export default function Home() {
     ttsChainRef.current = task.catch(() => undefined);
     return task;
   }, [playNextAudio]);
-
-  /** Append a finished user transcript line */
   const pushUserMessage = useCallback((text: string) => {
     setMessages((prev) => [
       ...prev,
@@ -208,7 +211,7 @@ export default function Home() {
   /** Stream the bot reply and speak complete sentences as they arrive */
   const handleChat = useCallback(async (text: string) => {
     // Guard: don't process if call has ended
-    if (!callActiveRef.current && !muted) return;
+    if (!callActiveRef.current && !mutedRef.current) return;
     try {
       // Recent turns give the brain context (follow-ups like "and in Pindi?")
       const prior = [...messagesRef.current];
@@ -224,7 +227,7 @@ export default function Home() {
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: text, language, stream: true, history }),
+        body: JSON.stringify({ message: text, language: languageRef.current, stream: true, history }),
       });
       if (!res.ok || !res.body) {
         console.error("Chat request failed:", res.status);
@@ -240,7 +243,7 @@ export default function Home() {
 
       while (true) {
         // Stop streaming if call has ended
-        if (!callActiveRef.current && !muted) break;
+        if (!callActiveRef.current && !mutedRef.current) break;
         const { done, value } = await reader.read();
         if (done) break;
         buffer += decoder.decode(value, { stream: true });
@@ -261,8 +264,8 @@ export default function Home() {
               unspokenBuffer = flushed.remaining;
               for (const sentence of flushed.sentences) {
                 // Stop speaking if call ended
-                if (!callActiveRef.current && !muted) break;
-                speak(normalizeUrdu(sentence), language);
+                if (!callActiveRef.current && !mutedRef.current) break;
+                speak(normalizeUrdu(sentence), languageRef.current);
               }
             }
           } catch {
@@ -273,8 +276,8 @@ export default function Home() {
 
       // Speak anything left after the stream ends (only if call still active)
       const final = unspokenBuffer.trim();
-      if (final && (callActiveRef.current || muted)) {
-        speak(normalizeUrdu(final), language);
+      if (final && (callActiveRef.current || mutedRef.current)) {
+        speak(normalizeUrdu(final), languageRef.current);
       }
       if (fullAnswer.trim()) {
         pushBotMessage(normalizeUrdu(fullAnswer.trim()));
@@ -291,7 +294,7 @@ export default function Home() {
         }
       }, 2000);
     }
-  }, [language, speak, pushBotMessage]);
+  }, [speak, pushBotMessage]);
 
   /* ── Pre-generate greeting audio so playback is instant on click ── */
   const greetingCacheRef = useRef<Partial<Record<Language, string>>>({});
