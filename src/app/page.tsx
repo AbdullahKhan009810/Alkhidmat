@@ -130,6 +130,15 @@ export default function Home() {
       currentPlaybackRef.current = null;
       playingRef.current = false;
       playNextAudio();
+      // Restart recognition AFTER audio finishes playing (not before)
+      if (!audioQueueRef.current.length && pendingSpeaksRef.current <= 0) {
+        if (recRestartTimeoutRef.current) clearTimeout(recRestartTimeoutRef.current);
+        recRestartTimeoutRef.current = setTimeout(() => {
+          if (recRef.current && callActiveRef.current) {
+            try { recRef.current.start(); } catch { /* ignore */ }
+          }
+        }, 1500);
+      }
     }
   }, []);
 
@@ -147,14 +156,6 @@ export default function Home() {
     if (recRef.current) {
       try { recRef.current.stop(); } catch { /* ignore */ }
     }
-    // Restart recognition after a short delay so it's ready when user responds,
-    // but botSpeakingRef stays true for 4s to block any echo results
-    if (recRestartTimeoutRef.current) clearTimeout(recRestartTimeoutRef.current);
-    recRestartTimeoutRef.current = setTimeout(() => {
-      if (recRef.current && callActiveRef.current) {
-        try { recRef.current.start(); } catch { /* ignore */ }
-      }
-    }, 1500);
 
     const task = ttsChainRef.current.then(async () => {
       if (generation !== audioGenerationRef.current) return;
