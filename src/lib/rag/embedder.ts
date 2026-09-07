@@ -15,7 +15,6 @@ import fs from "fs";
 import path from "path";
 
 const API_DIMS = 1024; // text-embedding-v4
-const LOCAL_DIMS = 384; // paraphrase-multilingual-MiniLM-L12-v2
 
 /* ── .env read from disk (dev server may hold stale process.env) ── */
 let envCache: { mtime: number; values: Record<string, string> } | null = null;
@@ -189,4 +188,3 @@ export async function warmUpEmbedder(): Promise<void> {
   await embedViaApi("warmup").catch(() => undefined);
 }
 
-export const EMBEDDING_DIMS = { api: API_DIMS, local: LOCAL_DIMS };

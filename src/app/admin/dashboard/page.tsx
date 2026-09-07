@@ -293,9 +293,6 @@ export default function DashboardPage() {
             View and manage welfare assistance requests
           </p>
           <div className="mt-5 text-center">
-            {/* <p className="text-xs font-medium uppercase tracking-wide text-gray-400">
-              Total Cases
-            </p> */}
             <p className="mt-1 text-3xl font-bold text-[#005A9E]">
               {loading ? "..." : conversations.length}
             </p>

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { readFileSync } from "fs";
+import { readFileSync, statSync } from "fs";
 import { join } from "path";
 
 export const runtime = "nodejs";
@@ -43,19 +43,34 @@ function setInCache(text: string, language: string, buffer: Buffer, mimeType: st
 }
 
 function readEnvValue(name: string): string | undefined {
+  const cached = getEnvCache();
+  return cached[name] ?? process.env[name];
+}
+
+/* ── .env cache (avoids re-reading disk on every TTS request) ── */
+let envCache: { mtime: number; values: Record<string, string> } | null = null;
+
+function getEnvCache(): Record<string, string> {
   try {
-    const envText = readFileSync(join(process.cwd(), ".env"), "utf8");
-    const line = envText
-      .split(/\r?\n/)
-      .find((entry) => entry.trim().startsWith(`${name}=`));
-    return line
-      ?.split("=")
-      .slice(1)
-      .join("=")
-      .trim()
-      .replace(/^['"]|['"]$/g, "");
+    const envPath = join(process.cwd(), ".env");
+    const mtime = statSync(envPath).mtimeMs;
+    if (envCache && mtime === envCache.mtime) return envCache.values;
+
+    const values: Record<string, string> = {};
+    for (const line of readFileSync(envPath, "utf8").split(/\r?\n/)) {
+      const t = line.trim();
+      if (!t || t.startsWith("#")) continue;
+      const i = t.indexOf("=");
+      if (i === -1) continue;
+      values[t.slice(0, i)] = t
+        .slice(i + 1)
+        .trim()
+        .replace(/^['"]|['"]$/g, "");
+    }
+    envCache = { mtime, values };
+    return values;
   } catch {
-    return undefined;
+    return {};
   }
 }
 

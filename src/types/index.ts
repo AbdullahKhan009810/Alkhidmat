@@ -1,3 +1,5 @@
+import type { Translations } from "@/lib/translations";
+
 /** Supported UI languages */
 export type Language = "en" | "ur";
 
@@ -13,13 +15,6 @@ export interface ButtonProps {
   icon?: React.ReactNode;
 }
 
-/** Props for the Badge / status-pill component */
-export interface BadgeProps {
-  label: string;
-  active?: boolean;
-  underline?: boolean;
-}
-
 /** Props for the ToggleSwitch component */
 export interface ToggleSwitchProps {
   label: string;
@@ -31,19 +26,6 @@ export interface ToggleSwitchProps {
 export interface LanguageToggleProps {
   activeLanguage: Language;
   onChange: (lang: Language) => void;
-}
-
-/** Resolved translation strings (shape defined in lib/translations.ts) */
-export interface Translations {
-  readyToAssist: string;
-  listening: string;
-  startCall: string;
-  endCall: string;
-  liveTranscript: string;
-  transcriptEmpty: string;
-  listeningForSpeech: string;
-  mute: string;
-  unmute: string;
 }
 
 /** Props for the CallPanel */

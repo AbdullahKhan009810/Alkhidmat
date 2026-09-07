@@ -75,7 +75,7 @@ export default function Home() {
   callActiveRef.current = callStatus === "listening" && !muted;
 
   /* Mirror of messages state — lets handleChat read the latest turns without
-     a stale closure (same pattern as callActiveRef) */
+     a stale closure */
   const messagesRef = useRef<ChatMessage[]>([]);
   messagesRef.current = messages;
 

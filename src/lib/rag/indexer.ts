@@ -12,6 +12,7 @@ import path from "path";
 import { PrismaClient } from "@prisma/client";
 import { pipeline, env } from "@huggingface/transformers";
 import { Index } from "@upstash/vector";
+import { UPSTASH_NAMESPACE } from "./upstash";
 
 const ROOT = path.resolve(process.cwd());
 const KB_DIR = path.join(ROOT, "data", "kb");
@@ -21,7 +22,6 @@ const EMBEDDING_MODEL =
   "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2";
 
 const CHUNK_SIZE = 400;
-const UPSTASH_NAMESPACE = "muawin-kb";
 
 env.cacheDir = path.join(ROOT, ".transformers-cache");
 env.allowLocalModels = true;
