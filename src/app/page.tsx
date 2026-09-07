@@ -487,8 +487,9 @@ export default function Home() {
         const greetingAudio = new Audio(cached);
         audioRef.current = greetingAudio;
         greetingAudio.onended = () => {
-          // Greeting finished — start 8-second debounce then reopen mic
-          // (same logic as playNextAudio when queue is empty)
+          // Greeting finished — short acoustic-decay delay then reopen mic.
+          // Greeting is a single short phrase, so 2 s is enough for echo
+          // to dissipate (unlike multi-sentence TTS which needs 8 s).
           if (botSpeakingTimeoutRef.current) clearTimeout(botSpeakingTimeoutRef.current);
           botSpeakingTimeoutRef.current = setTimeout(() => {
             if (pendingSpeaksRef.current <= 0 && !playingRef.current) {
@@ -498,7 +499,7 @@ export default function Home() {
               }
             }
             botSpeakingTimeoutRef.current = null;
-          }, 8000);
+          }, 2000);
         };
         greetingAudio
           .play()
