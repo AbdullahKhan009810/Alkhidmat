@@ -437,8 +437,6 @@ export default function Home() {
   const saveConversationToDB = useCallback(async () => {
     if (messages.length === 0) return;
 
-    setToast({ message: "Saving conversation to database...", type: "loading" });
-
     try {
       const sessionId = `TR-${Date.now().toString(36).toUpperCase()}`;
       const res = await fetch("/api/conversations", {
@@ -459,7 +457,7 @@ export default function Home() {
         throw new Error(error.error || "Failed to save");
       }
 
-      setToast({ message: `Conversation saved! (${messages.length} messages)`, type: "success" });
+      setToast({ message: "Call saved", type: "success" });
     } catch (err) {
       console.error("Failed to save conversation:", err);
       setToast({ message: `Error: ${err instanceof Error ? err.message : "Failed to save"}`, type: "error" });
