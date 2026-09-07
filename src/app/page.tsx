@@ -94,7 +94,8 @@ export default function Home() {
     if (playingRef.current) return;
     const next = audioQueueRef.current.shift();
     if (!next) {
-      // Queue empty — if no more TTS tasks pending, debounce mic reopen
+      // Queue empty — if no more TTS tasks pending, short acoustic-decay
+      // delay then reopen mic. 2 s is enough for speaker echo to dissipate.
       if (pendingSpeaksRef.current <= 0) {
         if (botSpeakingTimeoutRef.current) clearTimeout(botSpeakingTimeoutRef.current);
         botSpeakingTimeoutRef.current = setTimeout(() => {
@@ -107,7 +108,7 @@ export default function Home() {
             }
           }
           botSpeakingTimeoutRef.current = null;
-        }, 8000);
+        }, 2000);
       }
       return;
     }
