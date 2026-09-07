@@ -65,7 +65,6 @@ export default function Home() {
   const botSpeakingRef = useRef(false);
   const pendingSpeaksRef = useRef(0);
   const botSpeakingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const recRestartTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const recRef = useRef<any>(null);
   callActiveRef.current = callStatus === "listening" && !muted;
@@ -97,9 +96,13 @@ export default function Home() {
           // Only reopen if nothing new started during the debounce window
           if (pendingSpeaksRef.current <= 0 && !playingRef.current) {
             botSpeakingRef.current = false;
+            // Restart recognition now that echo has decayed
+            if (recRef.current && callActiveRef.current) {
+              try { recRef.current.start(); } catch { /* ignore */ }
+            }
           }
           botSpeakingTimeoutRef.current = null;
-        }, 4000);
+        }, 8000);
       }
       return;
     }
@@ -130,15 +133,6 @@ export default function Home() {
       currentPlaybackRef.current = null;
       playingRef.current = false;
       playNextAudio();
-      // Restart recognition AFTER audio finishes playing (not before)
-      if (!audioQueueRef.current.length && pendingSpeaksRef.current <= 0) {
-        if (recRestartTimeoutRef.current) clearTimeout(recRestartTimeoutRef.current);
-        recRestartTimeoutRef.current = setTimeout(() => {
-          if (recRef.current && callActiveRef.current) {
-            try { recRef.current.start(); } catch { /* ignore */ }
-          }
-        }, 1500);
-      }
     }
   }, []);
 
@@ -185,16 +179,10 @@ export default function Home() {
       }
     }).finally(() => {
       pendingSpeaksRef.current -= 1;
-      // All TTS fetches done and nothing playing — debounce mic reopen
-      if (pendingSpeaksRef.current <= 0 && audioQueueRef.current.length === 0 && !playingRef.current) {
-        if (botSpeakingTimeoutRef.current) clearTimeout(botSpeakingTimeoutRef.current);
-        botSpeakingTimeoutRef.current = setTimeout(() => {
-          if (pendingSpeaksRef.current <= 0 && !playingRef.current) {
-            botSpeakingRef.current = false;
-          }
-          botSpeakingTimeoutRef.current = null;
-        }, 4000);
-      }
+      // NOTE: Do NOT restart recognition or clear botSpeakingRef here.
+      // This fires when the TTS *fetch* completes, not when audio finishes playing.
+      // Mic restart is handled exclusively in playNextAudio's finally block,
+      // which fires AFTER the audio clip has actually finished playing.
     });
 
     ttsChainRef.current = task.catch(() => undefined);
@@ -503,10 +491,6 @@ export default function Home() {
       if (botSpeakingTimeoutRef.current) {
         clearTimeout(botSpeakingTimeoutRef.current);
         botSpeakingTimeoutRef.current = null;
-      }
-      if (recRestartTimeoutRef.current) {
-        clearTimeout(recRestartTimeoutRef.current);
-        recRestartTimeoutRef.current = null;
       }
 
       // Resolve the stuck playNextAudio promise so its finally block runs
