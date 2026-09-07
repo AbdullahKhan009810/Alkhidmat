@@ -65,6 +65,8 @@ export default function Home() {
   const botSpeakingRef = useRef(false);
   const pendingSpeaksRef = useRef(0);
   const botSpeakingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const recRef = useRef<any>(null);
   callActiveRef.current = callStatus === "listening" && !muted;
 
   /* Mirror of messages state — lets handleChat read the latest turns without
@@ -91,9 +93,13 @@ export default function Home() {
       if (pendingSpeaksRef.current <= 0) {
         if (botSpeakingTimeoutRef.current) clearTimeout(botSpeakingTimeoutRef.current);
         botSpeakingTimeoutRef.current = setTimeout(() => {
-          // Only close if nothing new started during the debounce window
+          // Only reopen if nothing new started during the debounce window
           if (pendingSpeaksRef.current <= 0 && !playingRef.current) {
             botSpeakingRef.current = false;
+            // Restart mic now that bot is done speaking
+            if (recRef.current && callActiveRef.current) {
+              try { recRef.current.start(); } catch { /* ignore */ }
+            }
           }
           botSpeakingTimeoutRef.current = null;
         }, 1500);
@@ -140,6 +146,10 @@ export default function Home() {
       clearTimeout(botSpeakingTimeoutRef.current);
       botSpeakingTimeoutRef.current = null;
     }
+    // Physically stop mic while bot speaks — prevents echo from laptop speakers
+    if (recRef.current) {
+      try { recRef.current.stop(); } catch { /* ignore */ }
+    }
 
     const task = ttsChainRef.current.then(async () => {
       if (generation !== audioGenerationRef.current) return;
@@ -175,6 +185,10 @@ export default function Home() {
         botSpeakingTimeoutRef.current = setTimeout(() => {
           if (pendingSpeaksRef.current <= 0 && !playingRef.current) {
             botSpeakingRef.current = false;
+            // Restart mic now that bot is done speaking
+            if (recRef.current && callActiveRef.current) {
+              try { recRef.current.start(); } catch { /* ignore */ }
+            }
           }
           botSpeakingTimeoutRef.current = null;
         }, 1500);
@@ -343,6 +357,7 @@ export default function Home() {
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const rec = new SR() as any;
+    recRef.current = rec;
     rec.lang = language === "ur" ? "ur-PK" : "en-US";
     rec.continuous = true;
     rec.interimResults = true;
@@ -381,6 +396,8 @@ export default function Home() {
     let cleaned = false;
     rec.onend = () => {
       if (cleaned) return;
+      // Don't restart if bot is speaking (mic was intentionally stopped)
+      if (botSpeakingRef.current) return;
       if (callActiveRef.current) {
         try {
           rec.start();
@@ -398,6 +415,7 @@ export default function Home() {
 
     return () => {
       cleaned = true;
+      recRef.current = null;
       rec.onresult = null;
       rec.onerror = null;
       rec.onend = null;
