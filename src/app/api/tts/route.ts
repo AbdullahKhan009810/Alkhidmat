@@ -86,6 +86,37 @@ function getElevenLabsDictId(): string | undefined {
   return readEnvValue("ELEVENLABS_PRONUNCIATION_DICT_ID") || process.env.ELEVENLABS_PRONUNCIATION_DICT_ID;
 }
 
+/* ── Circuit breaker: skip engines that are repeatedly failing ── */
+// After CB_THRESHOLD consecutive failures, skip the engine for CB_COOLDOWN_MS
+// so we don't wait 15s on every Urdu call while Uplift is down.
+const CB_THRESHOLD = 2;
+const CB_COOLDOWN_MS = 5 * 60 * 1000; // 5 minutes
+
+type CBState = { failures: number; openedAt: number };
+const cbStates = new Map<string, CBState>();
+
+function cbIsOpen(engine: string): boolean {
+  const s = cbStates.get(engine);
+  if (!s) return false;
+  if (s.failures >= CB_THRESHOLD) {
+    if (Date.now() - s.openedAt < CB_COOLDOWN_MS) return true;
+    // Cooldown elapsed — allow a probe attempt
+    s.failures = 0;
+  }
+  return false;
+}
+
+function cbRecordSuccess(engine: string) {
+  cbStates.delete(engine);
+}
+
+function cbRecordFailure(engine: string) {
+  const s = cbStates.get(engine) || { failures: 0, openedAt: 0 };
+  s.failures += 1;
+  if (s.failures >= CB_THRESHOLD) s.openedAt = Date.now();
+  cbStates.set(engine, s);
+}
+
 /** Wrap raw 16-bit mono PCM bytes in a WAV header so browsers can play it */
 function pcmToWav(pcm: Buffer, sampleRate: number): Buffer {
   const header = Buffer.alloc(44);
@@ -200,8 +231,11 @@ async function synthesizeWithUplift(
       signal: controller.signal,
     });
   } catch (err) {
-    if ((err as Error).name === "AbortError") {
-      console.error("Uplift AI TTS timed out after", timeoutMs, "ms");
+    const e = err as Error;
+    if (e.name === "AbortError") {
+      console.error(`Uplift AI TTS timed out after ${timeoutMs}ms`);
+    } else {
+      console.error("Uplift AI TTS threw:", e.name, "-", e.message);
     }
     return null;
   } finally {
@@ -245,8 +279,11 @@ async function synthesizeWithElevenLabs(
       signal: controller.signal,
     });
   } catch (err) {
-    if ((err as Error).name === "AbortError") {
-      console.error("ElevenLabs TTS timed out after", timeoutMs, "ms");
+    const e = err as Error;
+    if (e.name === "AbortError") {
+      console.error(`ElevenLabs TTS timed out after ${timeoutMs}ms`);
+    } else {
+      console.error("ElevenLabs TTS threw:", e.name, "-", e.message);
     }
     return null;
   } finally {
@@ -303,13 +340,17 @@ export async function POST(request: Request) {
       const upliftFormat = readEnvValue("UPLIFTAI_TTS_FORMAT") || "MP3_22050_128";
       usedEngine = "uplift";
 
-      if (upliftKey) {
+      if (upliftKey && !cbIsOpen("uplift")) {
         res = await synthesizeWithUplift(upliftKey, upliftVoice, processedText, upliftFormat);
         if (res && !res.ok) {
           const errText = await res.text();
           console.error("Uplift AI TTS failed:", res.status, errText.slice(0, 200));
           res = null;
         }
+        if (res) cbRecordSuccess("uplift");
+        else cbRecordFailure("uplift");
+      } else if (cbIsOpen("uplift")) {
+        console.warn("Uplift AI circuit breaker open — skipping to fallback");
       }
 
       // Fallback to ElevenLabs (Tisha) if Uplift failed
@@ -325,6 +366,8 @@ export async function POST(request: Request) {
             console.error("ElevenLabs fallback failed:", res.status);
             res = null;
           }
+          if (res) cbRecordSuccess("elevenlabs");
+          else cbRecordFailure("elevenlabs");
         }
       }
     } else {
@@ -332,7 +375,7 @@ export async function POST(request: Request) {
       const elevenKey = getElevenLabsApiKey();
       usedEngine = "elevenlabs";
 
-      if (elevenKey) {
+      if (elevenKey && !cbIsOpen("elevenlabs")) {
         const elevenModel = readEnvValue("ELEVENLABS_TTS_MODEL") || "eleven_flash_v2_5";
         const elevenVoice = readEnvValue("ELEVENLABS_TTS_VOICE_EN") || "aQLnnbQ6J7JYyvxnNgjx";
         res = await synthesizeWithElevenLabs(elevenKey, elevenModel, elevenVoice, processedText);
@@ -341,19 +384,27 @@ export async function POST(request: Request) {
           console.error("ElevenLabs English TTS failed:", res.status, errText.slice(0, 200));
           res = null;
         }
+        if (res) cbRecordSuccess("elevenlabs");
+        else cbRecordFailure("elevenlabs");
+      } else if (cbIsOpen("elevenlabs")) {
+        console.warn("ElevenLabs circuit breaker open — skipping to fallback");
       }
 
       // Fallback to Uplift if ElevenLabs failed
       if (!res) {
         usedEngine = "uplift-fallback";
         const upliftKey = getUpliftApiKey();
-        if (upliftKey) {
+        if (upliftKey && !cbIsOpen("uplift")) {
           const upliftFormat = readEnvValue("UPLIFTAI_TTS_FORMAT") || "MP3_22050_128";
           res = await synthesizeWithUplift(upliftKey, "broadband-support", processedText, upliftFormat);
           if (res && !res.ok) {
             console.error("Uplift fallback failed:", res.status);
             res = null;
           }
+          if (res) cbRecordSuccess("uplift");
+          else cbRecordFailure("uplift");
+        } else if (cbIsOpen("uplift")) {
+          console.warn("Uplift AI circuit breaker open — no fallback available");
         }
       }
     }

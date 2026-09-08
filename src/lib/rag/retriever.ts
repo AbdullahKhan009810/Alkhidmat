@@ -8,7 +8,7 @@
  */
 import fs from "fs";
 import path from "path";
-import { embedText, embedTextFor } from "./embedder";
+import { embedTextFor, API_DIMS } from "./embedder";
 import { getUpstashIndex } from "./upstash";
 
 const INDEX_FILE = process.env.KB_INDEX_FILE
@@ -168,12 +168,20 @@ export async function retrieve(
 
   const local = loadLocalIndex();
 
-  // Match the query embedding layer to the index vectors' dimension
+  // Match the query embedding layer to the index vectors' dimension.
+  // A 384-dim local vector scored against a 1024-dim index is meaningless,
+  // so when the API layer is required and unreachable we return no context
+  // instead of silently grounding the answer on garbage matches.
+  const indexDims = local && local.length > 0 ? local[0].vector.length : API_DIMS;
   let queryVector: number[];
-  if (local && local.length > 0 && local[0].vector.length !== 1024) {
-    queryVector = await embedTextFor(expanded, local[0].vector.length);
-  } else {
-    queryVector = await embedText(expanded);
+  try {
+    queryVector = await embedTextFor(expanded, indexDims);
+  } catch (err) {
+    console.error(
+      `Query embedding failed for ${indexDims}-dim index — returning no context:`,
+      (err as Error).message
+    );
+    return [];
   }
 
   if (!local) {

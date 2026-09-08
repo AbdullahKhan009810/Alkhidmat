@@ -14,7 +14,15 @@
 import fs from "fs";
 import path from "path";
 
-const API_DIMS = 1024; // text-embedding-v4
+export const API_DIMS = 1024; // text-embedding-v4
+
+/* Timeouts are wall-clock (AbortSignal.timeout), so in dev they also cover
+ * route compilation and event-loop stalls — not just network time. The first
+ * call additionally pays DNS + TLS to the MaaS region, so it gets a wider
+ * budget than subsequent warm calls. */
+const COLD_TIMEOUT_MS = 12_000;
+const WARM_TIMEOUT_MS = 6_000;
+let apiWarm = false;
 
 /* ── .env read from disk (dev server may hold stale process.env) ── */
 let envCache: { mtime: number; values: Record<string, string> } | null = null;
@@ -85,6 +93,37 @@ function cacheSet(cache: Map<string, number[]>, text: string, vec: number[]) {
 /* ── API embedding layer (primary) ───────────────────────────── */
 const inFlightApi = new Map<string, Promise<number[]>>();
 
+function isTimeout(err: unknown): boolean {
+  const e = err as Error;
+  return e?.name === "TimeoutError" || /aborted due to timeout/i.test(e?.message ?? "");
+}
+
+async function fetchEmbedding(text: string, timeoutMs: number): Promise<number[]> {
+  const { apiKey, baseUrl, embeddingModel } = getQwenConfig();
+  if (!apiKey) throw new Error("QWEN_API_KEY not configured");
+
+  const res = await fetch(`${baseUrl}/embeddings`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ model: embeddingModel, input: [text] }),
+    signal: AbortSignal.timeout(timeoutMs),
+  });
+
+  if (!res.ok) {
+    throw new Error(`Embedding API ${res.status}: ${(await res.text()).slice(0, 120)}`);
+  }
+
+  const data = await res.json();
+  const vec = data?.data?.[0]?.embedding;
+  if (!Array.isArray(vec) || vec.length === 0) {
+    throw new Error("Embedding API returned no vector");
+  }
+  return vec as number[];
+}
+
 async function embedViaApi(text: string): Promise<number[]> {
   const cached = cacheGet(apiCache, text);
   if (cached) return cached;
@@ -94,29 +133,18 @@ async function embedViaApi(text: string): Promise<number[]> {
   if (inFlight) return inFlight;
 
   const task = (async () => {
-    const { apiKey, baseUrl, embeddingModel } = getQwenConfig();
-    if (!apiKey) throw new Error("QWEN_API_KEY not configured");
-
-    const res = await fetch(`${baseUrl}/embeddings`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ model: embeddingModel, input: [text] }),
-      signal: AbortSignal.timeout(4000),
-    });
-
-    if (!res.ok) {
-      throw new Error(`Embedding API ${res.status}: ${(await res.text()).slice(0, 120)}`);
+    try {
+      const vec = await fetchEmbedding(text, apiWarm ? WARM_TIMEOUT_MS : COLD_TIMEOUT_MS);
+      apiWarm = true;
+      return vec;
+    } catch (err) {
+      if (!isTimeout(err)) throw err;
+      // Retry once: the socket is warm now, so this attempt is normally ~200ms.
+      console.warn("Embedding API timed out — retrying once");
+      const vec = await fetchEmbedding(text, COLD_TIMEOUT_MS);
+      apiWarm = true;
+      return vec;
     }
-
-    const data = await res.json();
-    const vec = data?.data?.[0]?.embedding;
-    if (!Array.isArray(vec) || vec.length === 0) {
-      throw new Error("Embedding API returned no vector");
-    }
-    return vec as number[];
   })();
 
   inFlightApi.set(text, task);
